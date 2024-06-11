@@ -1,0 +1,683 @@
+---
+title: "Energy Price Prediction"
+author: "Mert Yapucuoglu"
+format: html
+editor: visual
+---
+
+## Disclaimer
+
+ChatGPT 4.o by OpenAI was used generously for the generation of most of the code in this project.
+
+## Data
+
+For my project, I will be using [Hourly Energy Demand Generation and Weather](https://www.kaggle.com/datasets/nicholasjhana/energy-consumption-generation-prices-and-weather?resource=download) time series data from Kaggle. My reason for this is that I will be working with the data of an energy company this summer, and would like to have some exposure to what matters to these people and how to be able to make some prediction models. This dataset has 2 files, one with the hourly energy generation of many different energy sources, forecasted/actual load, day ahead, and actual prices. The other one has the weather information for the very same data points. I will be using only the first dataset, power generation, for simplicity. It already has plenty of predictors for us to choose from.
+
+```{python}
+import pandas as pd
+energy_df = pd.read_csv("energy_dataset.csv", parse_dates=['time'])
+pd.set_option('display.max_rows', None)  # Display all rows
+pd.set_option('display.max_columns', None)  # Display all columns
+```
+
+The next step is basic cleanup. Let’s describe the dataset.
+
+```{python}
+
+print(energy_df.describe())
+```
+
+We have many columns with vastly different ranges of values. Some columns have only NaNs, and some of them are all 0s. Those will be dropped. Let's check innocent missing data.
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import MinMaxScaler
+```
+
+```{python}
+energy_df['time'] = pd.to_datetime(energy_df['time'], utc=True)
+
+print("energy data nulls:")
+print(energy_df.isnull().sum())
+```
+
+It looks like we will also have to fill those in. I will simply take the average of the 2 points next to each. And because I am a machine learning guy and not a statistics person, I like my predictors normalized. It is also better for forecasting techniques, or so Google says. After preprocessing, the data looks like this:
+
+```{python}
+energy_df.set_index('time', inplace=True)
+data_ffill = energy_df.fillna(method='ffill')
+data_bfill = energy_df.fillna(method='bfill')
+
+data_filled = (data_ffill + data_bfill) / 2
+
+data_filled = data_filled.drop("generation hydro pumped storage aggregated",axis=1)
+data_filled = data_filled.drop("forecast wind offshore eday ahead",axis=1)
+
+e_df = data_filled
+
+
+scaler = MinMaxScaler()
+
+e_df_X = e_df.copy()
+e_df_X[e_df_X.columns] = scaler.fit_transform(e_df_X)
+
+e_df_X = e_df_X.drop("generation fossil oil shale", axis=1)
+e_df_X = e_df_X.drop("generation fossil peat", axis=1)
+e_df_X = e_df_X.drop("generation geothermal", axis=1)
+e_df_X = e_df_X.drop("generation fossil coal-derived gas", axis=1)
+e_df_X = e_df_X.drop("generation marine", axis=1)
+e_df_X = e_df_X.drop("generation wind offshore", axis=1)
+
+e_df_X.head()
+```
+
+```{python}
+df = e_df_X
+inf_counts = np.isinf(e_df_X).sum()
+inf_counts
+```
+
+We have 19 very nice predictors. Now we can get to business.
+
+## Questions
+
+Using our data science tools and common sense, we are hoping to answer the following questions in this project:
+
+-   How much does each different type of energy source affect the energy price?
+
+-   What model can we use to best predict energy prices?
+
+-   Which predictors should we use to predict energy prices?
+
+To find the answers to these questions, normalizing the values will come in handy because we can compare the coefficients and have a rough idea about the magnitude of the correlation. We will utilize linear regression, Arima, and XGBoost to predict the energy price using different sets of predictors. We will also utilize subset selection techniques as well as lasso to figure out what combination of predictors works well for linear regression.
+
+## Exploratory Analysis
+
+This is time series data after all, it wouldn’t be normal if we didn’t graph the target out.
+
+```{python}
+import matplotlib.pyplot as plt
+
+# Plot the time series
+plt.figure(figsize=(12, 6))
+plt.plot(df['price actual'])
+plt.title('Time Series Plot')
+plt.xlabel('Date')
+plt.ylabel('price actual')
+plt.show()
+```
+
+Nice, this is a very understandable, seasonal, and typical time-series data. Now, let's graph all of our columns.
+
+```{python}
+columns_to_plot = df.columns.tolist()
+
+plt.figure(figsize=(15, 10))
+
+for col in columns_to_plot:
+    plt.plot(df.index, df[col], label=col)
+
+
+plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+
+
+plt.title('Time Series Data for Predictors and Target')
+plt.xlabel('Date')
+plt.ylabel('Values')
+
+# Adjust layout for better display of the legend
+plt.tight_layout()
+
+# Show plot
+plt.show()
+```
+
+Interesting, but unhelpful. Let's make a grid.
+
+```{python}
+import math
+columns_to_plot = df.columns.tolist()
+
+num_columns = len(columns_to_plot)
+grid_size = math.ceil(math.sqrt(num_columns))
+
+fig, axes = plt.subplots(grid_size, grid_size, figsize=(20, 15), sharex=True)
+
+axes = axes.flatten()
+
+for i, col in enumerate(columns_to_plot):
+    axes[i].plot(df.index, df[col])
+    axes[i].set_title(col)
+    axes[i].tick_params(axis='x', rotation=45)
+
+for j in range(i + 1, len(axes)):
+    fig.delaxes(axes[j])
+
+plt.tight_layout()
+plt.show()
+```
+
+We can see that some of our predictors like generation solar, forecast solar, generation other renewable, generation nuclear, and generation fossil oil are almost always high up in their range. They are stable in their production except for some rare cases that define the minimum. This makes sense because min-max normalization was used. Except for this, the time series data looks good and reasonable.
+
+A correlation colormap can help foresee what can be useful.
+
+```{python}
+plt.figure(figsize=(10, 8))
+sns.heatmap(df.corr(), annot=True, cmap='coolwarm')
+plt.title('Correlation Heatmap')
+plt.show()
+```
+
+It looks like generation fossil brown coal/ignite,  generation fossil gas, generation fossil hard coal, generation hydro pumped storage consumption, generation hydro run-of-river and poundage, generation wind onshore, forecast wind onshore day ahead, total load forecast, total load actual, price day ahead, are correlated with our target variable.
+
+Aside from this, generation solar is highly correlated with forecast solar day ahead, generation wind onshore is highly correlated with forecast wind onshore day ahead,
+
+and total load forecast is highly correlated with total load actual. Of course, this makes total sense, as they are the forecasts of each other. To avoid multicollinearity, we shall remove the forecast columns for these 3 values from the data frame, as well as the price day ahead which is like cheating for predictions.
+
+```{python}
+df = df.drop(["forecast solar day ahead", "forecast wind onshore day ahead", "total load forecast", "price day ahead"], axis=1)
+```
+
+It is also good practice to look at the histograms of our predictors.
+
+```{python}
+num_columns = len(df.columns)
+
+num_rows = (num_columns + 2) // 3 
+
+fig, axes = plt.subplots(num_rows, 3, figsize=(15, num_rows * 5))
+
+axes = axes.flatten()
+
+for i, col in enumerate(df.columns):
+    sns.histplot(df[col], kde=False, ax=axes[i])
+    axes[i].set_title(f'Histogram of {col}')
+    axes[i].set_xlabel(col)
+    axes[i].set_ylabel('Frequency')
+
+for j in range(i + 1, len(axes)):
+    fig.delaxes(axes[j])
+
+plt.tight_layout()
+plt.show()
+```
+
+As we have also seen with the plots of the predictors, some of them are skewed towards one side. However, they are not so extreme enough to need additional work. If we had any extreme skews, I'd try using a different normalization technique.
+
+## Models
+
+1.  Linear Regression
+
+Lets start with linear regression. We will fit with each predictor 1 by 1 and see the error.
+
+```{python}
+import itertools
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
+import numpy as np
+
+target_variable = 'price actual'
+
+predictors = df.columns.drop(target_variable)
+
+results = []
+
+X = df[predictors]
+y = df[target_variable]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+for predictor in predictors:
+    X_train_single = X_train[[predictor]]
+    X_test_single = X_test[[predictor]]
+    
+    model = LinearRegression()
+    model.fit(X_train_single, y_train)
+    
+    y_pred = model.predict(X_test_single)
+    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+    
+    results.append((predictor, rmse))
+
+results.sort(key=lambda x: x[1])
+
+max_predictor_len = max(len(predictor) for predictor in predictors)
+
+header = f"{'Predictor':<{max_predictor_len}} {'RMSE':>10}"
+print(header)
+print("=" * (max_predictor_len + 11))
+for predictor, rmse in results:
+    print(f"{predictor:<{max_predictor_len}} {rmse:>10.4f}")
+
+```
+
+It seems that fossil gas and hard coal are the top 2 predictors, used to predict all by themselves of course. The best error we can get is 0.1176. Now lets try fitting with all of them, we want the really significant predictors, so the p-value cutoff will be at 0.01.
+
+```{python}
+import statsmodels.api as sm
+X_train_with_const = sm.add_constant(X_train)
+
+model_stats = sm.OLS(y_train, X_train_with_const).fit()
+
+p_values = model_stats.pvalues
+
+alpha = 0.01
+
+significant_coeffs = p_values[p_values < alpha]
+
+print("Significant coefficients and their p-values:")
+print(significant_coeffs)
+print()
+print("Insignificant coefficients:")
+print(p_values[p_values > alpha])
+
+X_test_with_const = sm.add_constant(X_test)
+y_pred = model_stats.predict(X_test_with_const)
+
+print("")
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+print(f'Statsmodels RMSE: {rmse}')
+```
+
+We see that generation fossil brown coal, generation nuclear, and generation hydro water reservoir are not really correlated to price actual when fit with all the predictors. However, the rest of the predictors make it through. The error we get is 0.105, which is just a little lower than just using fossil gas as a predictor. Maybe we can do better. Let's do backward selection for choosing our predictors better.
+
+```{python}
+
+# Backward Elimination
+def backward_elimination(X, y, significance_level=0.01):
+    num_features = X.shape[1]
+    for i in range(num_features, 0, -1):
+        X_with_const = sm.add_constant(X)
+        model = sm.OLS(y, X_with_const).fit()
+        p_values = model.pvalues.iloc[1:]  # Exclude constant term
+        max_p_value = p_values.max()
+        if max_p_value > significance_level:
+            max_p_value_index = p_values.idxmax()
+            X = X.drop(columns=max_p_value_index)
+        else:
+            break
+    return X
+    
+
+X_train_backward = backward_elimination(X_train, y_train)
+
+model_lr = LinearRegression()
+model_lr.fit(X_train_backward, y_train)
+
+y_pred_lr = model_lr.predict(X_test[X_train_backward.columns])
+
+rmse_lr = np.sqrt(mean_squared_error(y_test, y_pred_lr))
+print(f'Linear Regression RMSE: {rmse_lr}')
+
+X_train_backward_with_const = sm.add_constant(X_train_backward)
+model_lr_stats = sm.OLS(y_train, X_train_backward_with_const).fit()
+print("\nLinear Regression Coefficients:")
+
+backward_coef_names = zip(X.columns, model_lr.coef_)
+for column, coefficient in backward_coef_names:
+    print(f"{column}: {coefficient}")
+    
+# print(model_lr.coef_)
+print("\nLinear Regression P-values:")
+print(model_lr_stats.pvalues)
+
+```
+
+Very similar results to before, but a few additional predictors are eliminated. Nuclear, fossil brown coal, hydro water reservoir, generation solar do not make it through the backwards selection process, and we still keep a 0.105 RMSE. We will not try ridge regression to see if it helps.
+
+```{python}
+from sklearn.linear_model import Ridge
+ridge_model = Ridge(alpha=1.0)
+ridge_model.fit(X_train, y_train)
+
+# Make predictions
+y_pred = ridge_model.predict(X_test)
+
+# Calculate RMSE
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+print("RMSE:", rmse)
+
+# Get coefficients from Ridge regression
+ridge_coefficients = pd.Series(ridge_model.coef_, index=predictors)
+
+# Print coefficients
+print("Coefficients:")
+print(ridge_coefficients)
+```
+
+No improvement on RMSE, however, we see that with regularization, only some of the predictors keep their large coefficients. Fossil gas and renewables dominate the model when ridge regression is used.
+
+2.  SARIMAX
+
+Now let us try a little more complicated model, SARIMAX. This will try to take into account the seasonality of the data and make use of a moving average, which should be somewhat better than a boring linear regression. Lets do a grid search to see what parameters we can use.
+
+```{python}
+#| results: hide
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+df_M = df.resample('ME').mean()
+df_M = df_M.asfreq('ME')
+
+# Define the target variable and predictors
+target_variable = 'price actual'
+exog_vars = df_M.drop(columns=[target_variable])
+
+# Perform grid search for hyperparameter tuning
+p = d = q = range(0, 2)
+seasonal_p = seasonal_d = seasonal_q = range(0, 2)
+seasonal_s = [12]  # Seasonal period (12 for monthly data)
+
+# Generate all combinations of p, d, q triplets
+pdq = list(itertools.product(p, d, q))
+seasonal_pdq = list(itertools.product(seasonal_p, seasonal_d, seasonal_q, seasonal_s))
+
+best_aic = np.inf
+best_params = None
+best_seasonal_params = None
+
+for param in pdq:
+    for seasonal_param in seasonal_pdq:
+
+        try:
+            model = SARIMAX(df_M[target_variable],
+                            exog=exog_vars,
+                            order=param,
+                            seasonal_order=seasonal_param,
+                            enforce_stationarity=True,
+                            enforce_invertibility=False)
+                            
+            results = model.fit(disp=False,maxiter=300)
+            
+            
+            if results.aic < best_aic:
+                best_aic = results.aic
+                best_params = param
+                best_seasonal_params = seasonal_param
+        except Exception as e:
+            print(e)
+            continue
+
+print(f'Best SARIMAX params: {best_params}')
+print(f'Best Seasonal params: {best_seasonal_params}')
+print(f'Best AIC: {best_aic}')
+```
+
+Time to fit.
+
+```{python}
+sarimax_model = SARIMAX(df_M[target_variable],
+                        exog=exog_vars,
+                        order=best_params,
+                        seasonal_order=best_seasonal_params,
+                        enforce_stationarity=False,
+                        enforce_invertibility=False)
+sarimax_results = sarimax_model.fit()
+
+
+print(sarimax_results.summary())
+
+
+forecast_steps = 12
+future_exog_vars = exog_vars.iloc[-forecast_steps:]
+exog_vars_clean = exog_vars.dropna()
+
+forecast = sarimax_results.get_forecast(steps=forecast_steps, exog=future_exog_vars)
+
+
+    
+
+    
+forecast_index = pd.date_range(start=df_M.index[-1], periods=forecast_steps + 1, freq='M')[1:]
+
+
+
+
+
+forecast_df = pd.DataFrame(forecast.predicted_mean, index=forecast_index, columns=['Forecast'])
+
+forecast_df['Forecast'] = forecast.predicted_mean
+
+# Plot the original data and the forecast
+plt.figure(figsize=(10, 6))
+plt.plot(df_M[target_variable], label='Observed')
+plt.plot(forecast_df, label='Forecast', color='red')
+plt.fill_between(forecast_df.index,
+                 forecast.conf_int().iloc[:, 0],
+                 forecast.conf_int().iloc[:, 1],
+                 color='pink', alpha=0.7)
+plt.legend()
+plt.show()
+```
+
+This is a future forecast. We do not have the data for the electricty price in 2019. So we have no way of testing this. However, it sure looks pretty convincing. Now lets train with data up to 2018, and then predict the prices in 2018, then we can calculate an RMSE and see how it is doing.
+
+```{python}
+
+train_data = df_M.loc['2015-01':'2017-12']
+test_data = df_M.loc['2018-01':'2018-12']
+
+
+sarimax_model = SARIMAX(train_data[target_variable],
+                        exog=exog_vars.loc[train_data.index],
+                        order=(1,1,1),
+                        seasonal_order=(0,0,0,12),
+                        enforce_stationarity=False,
+                        enforce_invertibility=False)
+sarimax_results = sarimax_model.fit()
+
+
+forecast_steps = len(test_data)
+future_exog_vars = exog_vars.loc[test_data.index]
+
+forecast = sarimax_results.get_forecast(steps=forecast_steps, exog=future_exog_vars)
+
+
+    
+forecast_index = test_data.index
+
+
+forecast_df = pd.DataFrame(forecast.predicted_mean, index=forecast_index, columns=['Forecast'])
+
+forecast_df["Forecast"] = forecast.predicted_mean
+
+plt.figure(figsize=(10, 6))
+plt.plot(df_M[target_variable], label='Observed')
+plt.plot(forecast_df, label='Forecast', color='red')
+plt.fill_between(forecast_df.index,
+                 forecast.conf_int().iloc[:, 0],
+                 forecast.conf_int().iloc[:, 1],
+                 color='pink', alpha=0.7)
+plt.legend()
+plt.show()
+```
+
+Nice. While it isn't spot on, this is a very good prediction that captures the trend and the seasonality, and the real values are within the interval. It is not perfect however, lets see the error.
+
+```{python}
+mse = mean_squared_error(df_M[target_variable][-forecast_steps:], forecast_df['Forecast'])
+rmse = np.sqrt(mse)
+print("RMSE:", rmse)
+```
+
+It is definitely better than linear regression, and can be improved with further work.
+
+3.  Boosting - XGBoost
+
+To bring out the big guns, we will lastly use boosted trees, specifically XGBoost.
+
+```{python}
+import xgboost as xgb
+train_dmatrix = xgb.DMatrix(data=X_train, label=y_train)
+test_dmatrix = xgb.DMatrix(data=X_test, label=y_test)
+```
+
+```{python}
+
+# Define the parameters for XGBoost
+params = {
+    'objective': 'reg:squarederror',  # for regression
+    'eval_metric': 'rmse',            # evaluation metric
+    'max_depth': 5,                   # maximum depth of a tree
+    'eta': 0.10,                       # learning rate
+    'subsample': 0.8,                 # fraction of samples to be used for each tree
+    'colsample_bytree': 0.8           # fraction of features to be used for each tree
+}
+
+# Train the XGBoost model
+num_boost_round = 100
+xgboost_model = xgb.train(params, train_dmatrix, num_boost_round)
+
+# Make predictions
+y_pred = xgboost_model.predict(test_dmatrix)
+
+# Calculate RMSE
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+print(f'RMSE: {rmse:.4f}')
+
+# Print the feature importances
+feature_importances = xgboost_model.get_score(importance_type='weight')
+sorted_importances = sorted(feature_importances.items(), key=lambda x: x[1], reverse=True)
+print("Feature Importances:")
+for feature, importance in sorted_importances:
+    print(f"{feature}: {importance}")
+
+# Optional: Plot feature importances
+xgb.plot_importance(xgboost_model)
+plt.show()
+```
+
+RMSE is greatly improved from 0.105 to 0.0757. However, we can still optimize our hyperparameters. Let's do a grid search.
+
+```{python}
+from sklearn.model_selection import train_test_split, GridSearchCV
+xgboost_model = xgb.XGBRegressor(objective='reg:squarederror')
+
+# Define the parameter grid
+param_grid = {
+    'n_estimators': [50, 100, 200, 400],  # Number of boosting rounds
+    'max_depth': [3, 5, 7, 10],          # Maximum depth of a tree
+    'learning_rate': [0.01, 0.1, 0.2],  # Learning rate (eta)
+    'subsample': [0.8, 1.0],         # Subsample ratio of the training instances
+    'colsample_bytree': [0.8, 1.0]   # Subsample ratio of columns when constructing each tree
+}
+
+# Perform grid search
+grid_search = GridSearchCV(estimator=xgboost_model, param_grid=param_grid, cv=3, scoring='neg_mean_squared_error', verbose=1)
+grid_search.fit(X_train, y_train)
+
+# Get the best parameters and best model
+best_params = grid_search.best_params_
+best_model = grid_search.best_estimator_
+
+# Print the best parameters
+print(f'Best parameters: {best_params}')
+
+# Make predictions with the best model
+y_pred = best_model.predict(X_test)
+
+# Calculate RMSE
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+print(f'RMSE: {rmse:.4f}')
+
+# Print the feature importances
+feature_importances = best_model.get_booster().get_score(importance_type='weight')
+sorted_importances = sorted(feature_importances.items(), key=lambda x: x[1], reverse=True)
+print("Feature Importances:")
+for feature, importance in sorted_importances:
+    print(f"{feature}: {importance}")
+
+# Optional: Plot feature importances
+xgb.plot_importance(best_model)
+plt.show()
+```
+
+```{python}
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+print(f'RMSE: {rmse:.4f}')
+```
+
+With optimized hyperparameters, we get RMSE of 0.0440. This is less than half the error of a linear regression fit. We also see that biomass, fossil gas, and hard coal are the leading important features in the prediction.
+
+This is all good, and the error is low. However, it is not the same as forecasting. We are randomly picking from the data for training and testing. For a time series, we will have a series of continous data, so we should train with 2015 to 2017 data and try to predict the 2018 data like we did in SARIMAX.
+
+```{python}
+from xgboost import XGBRegressor, plot_importance
+train_data = df.loc['2015-01-01':'2017-12-31']
+test_data = df.loc['2018-01-01':'2018-12-31']
+
+
+train_exog = train_data.drop(columns=["price actual"])
+test_exog = test_data.drop(columns=["price actual"])
+
+
+param_grid = {
+    'n_estimators': [50, 100, 200, 400],  
+    'max_depth': [3, 5, 7, 10],          
+    'learning_rate': [0.01, 0.1, 0.2],    
+    'subsample': [0.8, 1.0],              
+    'colsample_bytree': [0.8, 1.0]        
+}
+
+
+xgboost_model = XGBRegressor(objective='reg:squarederror')
+
+grid_search = GridSearchCV(estimator=xgboost_model, param_grid=param_grid, cv=3, scoring='neg_mean_squared_error', verbose=1)
+grid_search.fit(train_exog, train_data[target_variable])
+
+best_params = grid_search.best_params_
+best_model = grid_search.best_estimator_
+
+
+predictions = best_model.predict(test_exog)
+
+rmse = np.sqrt(mean_squared_error(test_data[target_variable], predictions))
+print(f'RMSE: {rmse:.4f}')
+
+
+feature_importances = best_model.get_booster().get_score(importance_type='weight')
+sorted_importances = sorted(feature_importances.items(), key=lambda x: x[1], reverse=True)
+print("Feature Importances:")
+for feature, importance in sorted_importances:
+    print(f"{feature}: {importance}")
+
+
+plot_importance(best_model)
+plt.show()
+
+plt.figure(figsize=(10, 6))
+plt.plot(test_data[target_variable], label='Actual')
+plt.plot(test_data.index, predictions, label='Predicted', color='red')
+plt.xlabel('Date')
+plt.ylabel('Value')
+plt.title('XGBoost Model Predictions for 2018')
+plt.legend()
+plt.show()
+```
+
+```{python}
+rmse = np.sqrt(mean_squared_error(test_data[target_variable], predictions))
+print(f'RMSE: {rmse:.4f}')
+```
+
+We can see that when it is used for time series forecasting, it does do worse than an ARIMA model.
+
+## Results and Analysis
+
+As a result of our models and analysis, we can see that the best way to predict the electricty price for a day given the energy generation amount is with XGBoost. The method yielded a low error of 0.044, and is very easily and speedily trained with the little data we have. However, it is also the case that the very same model performed poorly when asked to forecast a full year given the data of the previous years. The reason for this is unknown.
+
+When it comes to forecasting a long time period, the SARIMAX model performed nicely. With an RMSE of 0.089, it performed better than linear regression models, even despite having only 3 years of data to learn from. It is very likely that the model would have improved greatly if it has a few more years of data.
+
+The linear regression models left a lot to desire, which was exactly what one would expect when working with seasonal data. Their error wasn't terrible because even though the price has seasonality, it roughly osciallates around a mean, and just has a slight slope over the years. So a straight line can at least catch that and always preserve an ok performance.
+
+Through the boosted tree and linear regression models, we have seen a couple of predictors usually occupy the top spot. We can use the coefficients of linear regression models because they have been normalized to be in the same range of 0 to 1. Meaning the coefficients represent the importance of their predictor, even if to at least a limited extent. Generation of electricity from biomass, fossil Gas, fossil coal, nuclear, and renewable sources showed up at the top the most often in our linear regression and XGBoost models.
+
+## Discussion and Conclusion
+
+Time series forecasting is a tricky topic. Time changes everything, and not everything can be explained with trend, seasonality, and some randomness. While many other submodels can be tried with different subsets of predictors and other hyperparameters, this gives us a nice idea on what our options are and how they perform on the limited data we had. It does look like SARIMAX is a very good tool to utilize when forecasting is to be done.

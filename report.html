@@ -1,0 +1,1656 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.450">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mert Yapucuoglu">
+
+<title>Energy Price Prediction</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="report_files/libs/clipboard/clipboard.min.js"></script>
+<script src="report_files/libs/quarto-html/quarto.js"></script>
+<script src="report_files/libs/quarto-html/popper.min.js"></script>
+<script src="report_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="report_files/libs/quarto-html/anchor.min.js"></script>
+<link href="report_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="report_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="report_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="report_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="report_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Energy Price Prediction</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Mert Yapucuoglu </p>
+          </div>
+  </div>
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="disclaimer" class="level2">
+<h2 class="anchored" data-anchor-id="disclaimer">Disclaimer</h2>
+<p>ChatGPT 4.o by OpenAI was used generously for the generation of most of the code in this project.</p>
+</section>
+<section id="data" class="level2">
+<h2 class="anchored" data-anchor-id="data">Data</h2>
+<p>For my project, I will be using <a href="https://www.kaggle.com/datasets/nicholasjhana/energy-consumption-generation-prices-and-weather?resource=download">Hourly Energy Demand Generation and Weather</a> time series data from Kaggle. My reason for this is that I will be working with the data of an energy company this summer, and would like to have some exposure to what matters to these people and how to be able to make some prediction models. This dataset has 2 files, one with the hourly energy generation of many different energy sources, forecasted/actual load, day ahead, and actual prices. The other one has the weather information for the very same data points. I will be using only the first dataset, power generation, for simplicity. It already has plenty of predictors for us to choose from.</p>
+<div class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>energy_df <span class="op">=</span> pd.read_csv(<span class="st">"energy_dataset.csv"</span>, parse_dates<span class="op">=</span>[<span class="st">'time'</span>])</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>pd.set_option(<span class="st">'display.max_rows'</span>, <span class="va">None</span>)  <span class="co"># Display all rows</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>pd.set_option(<span class="st">'display.max_columns'</span>, <span class="va">None</span>)  <span class="co"># Display all columns</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>The next step is basic cleanup. Let’s describe the dataset.</p>
+<div class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(energy_df.describe())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>       generation biomass  generation fossil brown coal/lignite  \
+count        35045.000000                          35046.000000   
+mean           383.513540                            448.059208   
+std             85.353943                            354.568590   
+min              0.000000                              0.000000   
+25%            333.000000                              0.000000   
+50%            367.000000                            509.000000   
+75%            433.000000                            757.000000   
+max            592.000000                            999.000000   
+
+       generation fossil coal-derived gas  generation fossil gas  \
+count                             35046.0           35046.000000   
+mean                                  0.0            5622.737488   
+std                                   0.0            2201.830478   
+min                                   0.0               0.000000   
+25%                                   0.0            4126.000000   
+50%                                   0.0            4969.000000   
+75%                                   0.0            6429.000000   
+max                                   0.0           20034.000000   
+
+       generation fossil hard coal  generation fossil oil  \
+count                 35046.000000           35045.000000   
+mean                   4256.065742             298.319789   
+std                    1961.601013              52.520673   
+min                       0.000000               0.000000   
+25%                    2527.000000             263.000000   
+50%                    4474.000000             300.000000   
+75%                    5838.750000             330.000000   
+max                    8359.000000             449.000000   
+
+       generation fossil oil shale  generation fossil peat  \
+count                      35046.0                 35046.0   
+mean                           0.0                     0.0   
+std                            0.0                     0.0   
+min                            0.0                     0.0   
+25%                            0.0                     0.0   
+50%                            0.0                     0.0   
+75%                            0.0                     0.0   
+max                            0.0                     0.0   
+
+       generation geothermal  generation hydro pumped storage aggregated  \
+count                35046.0                                         0.0   
+mean                     0.0                                         NaN   
+std                      0.0                                         NaN   
+min                      0.0                                         NaN   
+25%                      0.0                                         NaN   
+50%                      0.0                                         NaN   
+75%                      0.0                                         NaN   
+max                      0.0                                         NaN   
+
+       generation hydro pumped storage consumption  \
+count                                 35045.000000   
+mean                                    475.577343   
+std                                     792.406614   
+min                                       0.000000   
+25%                                       0.000000   
+50%                                      68.000000   
+75%                                     616.000000   
+max                                    4523.000000   
+
+       generation hydro run-of-river and poundage  \
+count                                35045.000000   
+mean                                   972.116108   
+std                                    400.777536   
+min                                      0.000000   
+25%                                    637.000000   
+50%                                    906.000000   
+75%                                   1250.000000   
+max                                   2000.000000   
+
+       generation hydro water reservoir  generation marine  \
+count                      35046.000000            35045.0   
+mean                        2605.114735                0.0   
+std                         1835.199745                0.0   
+min                            0.000000                0.0   
+25%                         1077.250000                0.0   
+50%                         2164.000000                0.0   
+75%                         3757.000000                0.0   
+max                         9728.000000                0.0   
+
+       generation nuclear  generation other  generation other renewable  \
+count        35047.000000      35046.000000                35046.000000   
+mean          6263.907039         60.228585                   85.639702   
+std            839.667958         20.238381                   14.077554   
+min              0.000000          0.000000                    0.000000   
+25%           5760.000000         53.000000                   73.000000   
+50%           6566.000000         57.000000                   88.000000   
+75%           7025.000000         80.000000                   97.000000   
+max           7117.000000        106.000000                  119.000000   
+
+       generation solar  generation waste  generation wind offshore  \
+count      35046.000000      35045.000000                   35046.0   
+mean        1432.665925        269.452133                       0.0   
+std         1680.119887         50.195536                       0.0   
+min            0.000000          0.000000                       0.0   
+25%           71.000000        240.000000                       0.0   
+50%          616.000000        279.000000                       0.0   
+75%         2578.000000        310.000000                       0.0   
+max         5792.000000        357.000000                       0.0   
+
+       generation wind onshore  forecast solar day ahead  \
+count             35046.000000              35064.000000   
+mean               5464.479769               1439.066735   
+std                3213.691587               1677.703355   
+min                   0.000000                  0.000000   
+25%                2933.000000                 69.000000   
+50%                4849.000000                576.000000   
+75%                7398.000000               2636.000000   
+max               17436.000000               5836.000000   
+
+       forecast wind offshore eday ahead  forecast wind onshore day ahead  \
+count                                0.0                     35064.000000   
+mean                                 NaN                      5471.216689   
+std                                  NaN                      3176.312853   
+min                                  NaN                       237.000000   
+25%                                  NaN                      2979.000000   
+50%                                  NaN                      4855.000000   
+75%                                  NaN                      7353.000000   
+max                                  NaN                     17430.000000   
+
+       total load forecast  total load actual  price day ahead  price actual  
+count         35064.000000       35028.000000     35064.000000  35064.000000  
+mean          28712.129962       28696.939905        49.874341     57.884023  
+std            4594.100854        4574.987950        14.618900     14.204083  
+min           18105.000000       18041.000000         2.060000      9.330000  
+25%           24793.750000       24807.750000        41.490000     49.347500  
+50%           28906.000000       28901.000000        50.520000     58.020000  
+75%           32263.250000       32192.000000        60.530000     68.010000  
+max           41390.000000       41015.000000       101.990000    116.800000  </code></pre>
+</div>
+</div>
+<p>We have many columns with vastly different ranges of values. Some columns have only NaNs, and some of them are all 0s. Those will be dropped. Let’s check innocent missing data.</p>
+<div class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> seaborn <span class="im">as</span> sns</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.preprocessing <span class="im">import</span> StandardScaler</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.decomposition <span class="im">import</span> PCA</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> train_test_split</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> LinearRegression</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> mean_squared_error</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.preprocessing <span class="im">import</span> MinMaxScaler</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>energy_df[<span class="st">'time'</span>] <span class="op">=</span> pd.to_datetime(energy_df[<span class="st">'time'</span>], utc<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"energy data nulls:"</span>)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(energy_df.isnull().<span class="bu">sum</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>energy data nulls:
+time                                               0
+generation biomass                                19
+generation fossil brown coal/lignite              18
+generation fossil coal-derived gas                18
+generation fossil gas                             18
+generation fossil hard coal                       18
+generation fossil oil                             19
+generation fossil oil shale                       18
+generation fossil peat                            18
+generation geothermal                             18
+generation hydro pumped storage aggregated     35064
+generation hydro pumped storage consumption       19
+generation hydro run-of-river and poundage        19
+generation hydro water reservoir                  18
+generation marine                                 19
+generation nuclear                                17
+generation other                                  18
+generation other renewable                        18
+generation solar                                  18
+generation waste                                  19
+generation wind offshore                          18
+generation wind onshore                           18
+forecast solar day ahead                           0
+forecast wind offshore eday ahead              35064
+forecast wind onshore day ahead                    0
+total load forecast                                0
+total load actual                                 36
+price day ahead                                    0
+price actual                                       0
+dtype: int64</code></pre>
+</div>
+</div>
+<p>It looks like we will also have to fill those in. I will simply take the average of the 2 points next to each. And because I am a machine learning guy and not a statistics person, I like my predictors normalized. It is also better for forecasting techniques, or so Google says. After preprocessing, the data looks like this:</p>
+<div class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>energy_df.set_index(<span class="st">'time'</span>, inplace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>data_ffill <span class="op">=</span> energy_df.fillna(method<span class="op">=</span><span class="st">'ffill'</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>data_bfill <span class="op">=</span> energy_df.fillna(method<span class="op">=</span><span class="st">'bfill'</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>data_filled <span class="op">=</span> (data_ffill <span class="op">+</span> data_bfill) <span class="op">/</span> <span class="dv">2</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>data_filled <span class="op">=</span> data_filled.drop(<span class="st">"generation hydro pumped storage aggregated"</span>,axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>data_filled <span class="op">=</span> data_filled.drop(<span class="st">"forecast wind offshore eday ahead"</span>,axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>e_df <span class="op">=</span> data_filled</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>scaler <span class="op">=</span> MinMaxScaler()</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>e_df_X <span class="op">=</span> e_df.copy()</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>e_df_X[e_df_X.columns] <span class="op">=</span> scaler.fit_transform(e_df_X)</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>e_df_X <span class="op">=</span> e_df_X.drop(<span class="st">"generation fossil oil shale"</span>, axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>e_df_X <span class="op">=</span> e_df_X.drop(<span class="st">"generation fossil peat"</span>, axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>e_df_X <span class="op">=</span> e_df_X.drop(<span class="st">"generation geothermal"</span>, axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>e_df_X <span class="op">=</span> e_df_X.drop(<span class="st">"generation fossil coal-derived gas"</span>, axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>e_df_X <span class="op">=</span> e_df_X.drop(<span class="st">"generation marine"</span>, axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>e_df_X <span class="op">=</span> e_df_X.drop(<span class="st">"generation wind offshore"</span>, axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>e_df_X.head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>C:\Users\merto\AppData\Local\Temp\ipykernel_15684\2299405197.py:2: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  data_ffill = energy_df.fillna(method='ffill')
+C:\Users\merto\AppData\Local\Temp\ipykernel_15684\2299405197.py:3: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  data_bfill = energy_df.fillna(method='bfill')</code></pre>
+</div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">generation biomass</th>
+<th data-quarto-table-cell-role="th">generation fossil brown coal/lignite</th>
+<th data-quarto-table-cell-role="th">generation fossil gas</th>
+<th data-quarto-table-cell-role="th">generation fossil hard coal</th>
+<th data-quarto-table-cell-role="th">generation fossil oil</th>
+<th data-quarto-table-cell-role="th">generation hydro pumped storage consumption</th>
+<th data-quarto-table-cell-role="th">generation hydro run-of-river and poundage</th>
+<th data-quarto-table-cell-role="th">generation hydro water reservoir</th>
+<th data-quarto-table-cell-role="th">generation nuclear</th>
+<th data-quarto-table-cell-role="th">generation other</th>
+<th data-quarto-table-cell-role="th">generation other renewable</th>
+<th data-quarto-table-cell-role="th">generation solar</th>
+<th data-quarto-table-cell-role="th">generation waste</th>
+<th data-quarto-table-cell-role="th">generation wind onshore</th>
+<th data-quarto-table-cell-role="th">forecast solar day ahead</th>
+<th data-quarto-table-cell-role="th">forecast wind onshore day ahead</th>
+<th data-quarto-table-cell-role="th">total load forecast</th>
+<th data-quarto-table-cell-role="th">total load actual</th>
+<th data-quarto-table-cell-role="th">price day ahead</th>
+<th data-quarto-table-cell-role="th">price actual</th>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">time</th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2014-12-31 23:00:00+00:00</td>
+<td>0.755068</td>
+<td>0.329329</td>
+<td>0.241789</td>
+<td>0.576744</td>
+<td>0.360802</td>
+<td>0.190803</td>
+<td>0.5255</td>
+<td>0.195210</td>
+<td>0.997049</td>
+<td>0.40566</td>
+<td>0.613445</td>
+<td>0.008460</td>
+<td>0.549020</td>
+<td>0.365795</td>
+<td>0.002913</td>
+<td>0.360554</td>
+<td>0.344127</td>
+<td>0.319666</td>
+<td>0.480737</td>
+<td>0.521820</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">2015-01-01 00:00:00+00:00</td>
+<td>0.758446</td>
+<td>0.328328</td>
+<td>0.259359</td>
+<td>0.568848</td>
+<td>0.351893</td>
+<td>0.203405</td>
+<td>0.5045</td>
+<td>0.170436</td>
+<td>0.997049</td>
+<td>0.40566</td>
+<td>0.596639</td>
+<td>0.008633</td>
+<td>0.546218</td>
+<td>0.337807</td>
+<td>0.002742</td>
+<td>0.326819</td>
+<td>0.293279</td>
+<td>0.276008</td>
+<td>0.460723</td>
+<td>0.517261</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2015-01-01 01:00:00+00:00</td>
+<td>0.756757</td>
+<td>0.323323</td>
+<td>0.242438</td>
+<td>0.548032</td>
+<td>0.349666</td>
+<td>0.257351</td>
+<td>0.4865</td>
+<td>0.140933</td>
+<td>0.997471</td>
+<td>0.40566</td>
+<td>0.613445</td>
+<td>0.008633</td>
+<td>0.549020</td>
+<td>0.313203</td>
+<td>0.001371</td>
+<td>0.303437</td>
+<td>0.232338</td>
+<td>0.204274</td>
+<td>0.453017</td>
+<td>0.513166</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">2015-01-01 02:00:00+00:00</td>
+<td>0.739865</td>
+<td>0.254254</td>
+<td>0.215334</td>
+<td>0.494198</td>
+<td>0.356347</td>
+<td>0.332302</td>
+<td>0.4745</td>
+<td>0.080078</td>
+<td>0.997330</td>
+<td>0.40566</td>
+<td>0.630252</td>
+<td>0.008633</td>
+<td>0.535014</td>
+<td>0.300413</td>
+<td>0.000343</td>
+<td>0.285814</td>
+<td>0.194846</td>
+<td>0.141247</td>
+<td>0.402382</td>
+<td>0.465153</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2015-01-01 03:00:00+00:00</td>
+<td>0.722973</td>
+<td>0.187187</td>
+<td>0.206150</td>
+<td>0.459385</td>
+<td>0.347439</td>
+<td>0.403714</td>
+<td>0.4765</td>
+<td>0.074013</td>
+<td>0.997190</td>
+<td>0.40566</td>
+<td>0.621849</td>
+<td>0.007251</td>
+<td>0.529412</td>
+<td>0.283035</td>
+<td>0.001542</td>
+<td>0.268947</td>
+<td>0.158042</td>
+<td>0.096762</td>
+<td>0.363755</td>
+<td>0.434633</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> e_df_X</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>inf_counts <span class="op">=</span> np.isinf(e_df_X).<span class="bu">sum</span>()</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>inf_counts</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<pre><code>generation biomass                             0
+generation fossil brown coal/lignite           0
+generation fossil gas                          0
+generation fossil hard coal                    0
+generation fossil oil                          0
+generation hydro pumped storage consumption    0
+generation hydro run-of-river and poundage     0
+generation hydro water reservoir               0
+generation nuclear                             0
+generation other                               0
+generation other renewable                     0
+generation solar                               0
+generation waste                               0
+generation wind onshore                        0
+forecast solar day ahead                       0
+forecast wind onshore day ahead                0
+total load forecast                            0
+total load actual                              0
+price day ahead                                0
+price actual                                   0
+dtype: int64</code></pre>
+</div>
+</div>
+<p>We have 19 very nice predictors. Now we can get to business.</p>
+</section>
+<section id="questions" class="level2">
+<h2 class="anchored" data-anchor-id="questions">Questions</h2>
+<p>Using our data science tools and common sense, we are hoping to answer the following questions in this project:</p>
+<ul>
+<li><p>How much does each different type of energy source affect the energy price?</p></li>
+<li><p>What model can we use to best predict energy prices?</p></li>
+<li><p>Which predictors should we use to predict energy prices?</p></li>
+</ul>
+<p>To find the answers to these questions, normalizing the values will come in handy because we can compare the coefficients and have a rough idea about the magnitude of the correlation. We will utilize linear regression, Arima, and XGBoost to predict the energy price using different sets of predictors. We will also utilize subset selection techniques as well as lasso to figure out what combination of predictors works well for linear regression.</p>
+</section>
+<section id="exploratory-analysis" class="level2">
+<h2 class="anchored" data-anchor-id="exploratory-analysis">Exploratory Analysis</h2>
+<p>This is time series data after all, it wouldn’t be normal if we didn’t graph the target out.</p>
+<div class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot the time series</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">12</span>, <span class="dv">6</span>))</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>plt.plot(df[<span class="st">'price actual'</span>])</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">'Time Series Plot'</span>)</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'Date'</span>)</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">'price actual'</span>)</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="report_files/figure-html/cell-8-output-1.png" width="961" height="523"></p>
+</div>
+</div>
+<p>Nice, this is a very understandable, seasonal, and typical time-series data. Now, let’s graph all of our columns.</p>
+<div class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>columns_to_plot <span class="op">=</span> df.columns.tolist()</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">15</span>, <span class="dv">10</span>))</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> col <span class="kw">in</span> columns_to_plot:</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    plt.plot(df.index, df[col], label<span class="op">=</span>col)</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>plt.legend(loc<span class="op">=</span><span class="st">'upper left'</span>, bbox_to_anchor<span class="op">=</span>(<span class="dv">1</span>, <span class="dv">1</span>))</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">'Time Series Data for Predictors and Target'</span>)</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'Date'</span>)</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">'Values'</span>)</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Adjust layout for better display of the legend</span></span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a><span class="co"># Show plot</span></span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="report_files/figure-html/cell-9-output-1.png" width="1427" height="950"></p>
+</div>
+</div>
+<p>Interesting, but unhelpful. Let’s make a grid.</p>
+<div class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>columns_to_plot <span class="op">=</span> df.columns.tolist()</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>num_columns <span class="op">=</span> <span class="bu">len</span>(columns_to_plot)</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>grid_size <span class="op">=</span> math.ceil(math.sqrt(num_columns))</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(grid_size, grid_size, figsize<span class="op">=</span>(<span class="dv">20</span>, <span class="dv">15</span>), sharex<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>axes <span class="op">=</span> axes.flatten()</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i, col <span class="kw">in</span> <span class="bu">enumerate</span>(columns_to_plot):</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>    axes[i].plot(df.index, df[col])</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>    axes[i].set_title(col)</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>    axes[i].tick_params(axis<span class="op">=</span><span class="st">'x'</span>, rotation<span class="op">=</span><span class="dv">45</span>)</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(i <span class="op">+</span> <span class="dv">1</span>, <span class="bu">len</span>(axes)):</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>    fig.delaxes(axes[j])</span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="report_files/figure-html/cell-10-output-1.png" width="1910" height="1149"></p>
+</div>
+</div>
+<p>We can see that some of our predictors like generation solar, forecast solar, generation other renewable, generation nuclear, and generation fossil oil are almost always high up in their range. They are stable in their production except for some rare cases that define the minimum. This makes sense because min-max normalization was used. Except for this, the time series data looks good and reasonable.</p>
+<p>A correlation colormap can help foresee what can be useful.</p>
+<div class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>sns.heatmap(df.corr(), annot<span class="op">=</span><span class="va">True</span>, cmap<span class="op">=</span><span class="st">'coolwarm'</span>)</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">'Correlation Heatmap'</span>)</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="report_files/figure-html/cell-11-output-1.png" width="1051" height="959"></p>
+</div>
+</div>
+<p>It looks like generation fossil brown coal/ignite,&nbsp; generation fossil gas, generation fossil hard coal, generation hydro pumped storage consumption, generation hydro run-of-river and poundage, generation wind onshore, forecast wind onshore day ahead, total load forecast, total load actual, price day ahead, are correlated with our target variable.</p>
+<p>Aside from this, generation solar is highly correlated with forecast solar day ahead, generation wind onshore is highly correlated with forecast wind onshore day ahead,</p>
+<p>and total load forecast is highly correlated with total load actual. Of course, this makes total sense, as they are the forecasts of each other. To avoid multicollinearity, we shall remove the forecast columns for these 3 values from the data frame, as well as the price day ahead which is like cheating for predictions.</p>
+<div class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> df.drop([<span class="st">"forecast solar day ahead"</span>, <span class="st">"forecast wind onshore day ahead"</span>, <span class="st">"total load forecast"</span>, <span class="st">"price day ahead"</span>], axis<span class="op">=</span><span class="dv">1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>It is also good practice to look at the histograms of our predictors.</p>
+<div class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>num_columns <span class="op">=</span> <span class="bu">len</span>(df.columns)</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>num_rows <span class="op">=</span> (num_columns <span class="op">+</span> <span class="dv">2</span>) <span class="op">//</span> <span class="dv">3</span> </span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(num_rows, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="dv">15</span>, num_rows <span class="op">*</span> <span class="dv">5</span>))</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>axes <span class="op">=</span> axes.flatten()</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i, col <span class="kw">in</span> <span class="bu">enumerate</span>(df.columns):</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>    sns.histplot(df[col], kde<span class="op">=</span><span class="va">False</span>, ax<span class="op">=</span>axes[i])</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>    axes[i].set_title(<span class="ss">f'Histogram of </span><span class="sc">{</span>col<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>    axes[i].set_xlabel(col)</span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>    axes[i].set_ylabel(<span class="st">'Frequency'</span>)</span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(i <span class="op">+</span> <span class="dv">1</span>, <span class="bu">len</span>(axes)):</span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>    fig.delaxes(axes[j])</span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<p><img src="report_files/figure-html/cell-13-output-1.png" width="1479" height="2870"></p>
+</div>
+</div>
+<p>As we have also seen with the plots of the predictors, some of them are skewed towards one side. However, they are not so extreme enough to need additional work. If we had any extreme skews, I’d try using a different normalization technique.</p>
+</section>
+<section id="models" class="level2">
+<h2 class="anchored" data-anchor-id="models">Models</h2>
+<ol type="1">
+<li>Linear Regression</li>
+</ol>
+<p>Lets start with linear regression. We will fit with each predictor 1 by 1 and see the error.</p>
+<div class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> itertools</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> train_test_split</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> LinearRegression</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> mean_squared_error</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>target_variable <span class="op">=</span> <span class="st">'price actual'</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>predictors <span class="op">=</span> df.columns.drop(target_variable)</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> []</span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> df[predictors]</span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>y <span class="op">=</span> df[target_variable]</span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>X_train, X_test, y_train, y_test <span class="op">=</span> train_test_split(X, y, test_size<span class="op">=</span><span class="fl">0.2</span>, random_state<span class="op">=</span><span class="dv">42</span>)</span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> predictor <span class="kw">in</span> predictors:</span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a>    X_train_single <span class="op">=</span> X_train[[predictor]]</span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a>    X_test_single <span class="op">=</span> X_test[[predictor]]</span>
+<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> LinearRegression()</span>
+<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a>    model.fit(X_train_single, y_train)</span>
+<span id="cb17-23"><a href="#cb17-23" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb17-24"><a href="#cb17-24" aria-hidden="true" tabindex="-1"></a>    y_pred <span class="op">=</span> model.predict(X_test_single)</span>
+<span id="cb17-25"><a href="#cb17-25" aria-hidden="true" tabindex="-1"></a>    rmse <span class="op">=</span> np.sqrt(mean_squared_error(y_test, y_pred))</span>
+<span id="cb17-26"><a href="#cb17-26" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb17-27"><a href="#cb17-27" aria-hidden="true" tabindex="-1"></a>    results.append((predictor, rmse))</span>
+<span id="cb17-28"><a href="#cb17-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-29"><a href="#cb17-29" aria-hidden="true" tabindex="-1"></a>results.sort(key<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="dv">1</span>])</span>
+<span id="cb17-30"><a href="#cb17-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-31"><a href="#cb17-31" aria-hidden="true" tabindex="-1"></a>max_predictor_len <span class="op">=</span> <span class="bu">max</span>(<span class="bu">len</span>(predictor) <span class="cf">for</span> predictor <span class="kw">in</span> predictors)</span>
+<span id="cb17-32"><a href="#cb17-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-33"><a href="#cb17-33" aria-hidden="true" tabindex="-1"></a>header <span class="op">=</span> <span class="ss">f"</span><span class="sc">{</span><span class="st">'Predictor'</span><span class="sc">:</span><span class="op">&lt;</span>{max_predictor_len}<span class="sc">}</span><span class="ss"> </span><span class="sc">{</span><span class="st">'RMSE'</span><span class="sc">:&gt;10}</span><span class="ss">"</span></span>
+<span id="cb17-34"><a href="#cb17-34" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(header)</span>
+<span id="cb17-35"><a href="#cb17-35" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"="</span> <span class="op">*</span> (max_predictor_len <span class="op">+</span> <span class="dv">11</span>))</span>
+<span id="cb17-36"><a href="#cb17-36" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> predictor, rmse <span class="kw">in</span> results:</span>
+<span id="cb17-37"><a href="#cb17-37" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>predictor<span class="sc">:</span><span class="op">&lt;</span>{max_predictor_len}<span class="sc">}</span><span class="ss"> </span><span class="sc">{</span>rmse<span class="sc">:&gt;10.4f}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Predictor                                         RMSE
+======================================================
+generation fossil gas                           0.1176
+generation fossil hard coal                     0.1182
+total load actual                               0.1198
+generation hydro pumped storage consumption     0.1200
+generation fossil brown coal/lignite            0.1240
+generation fossil oil                           0.1269
+generation other renewable                      0.1279
+generation wind onshore                         0.1296
+generation waste                                0.1305
+generation biomass                              0.1313
+generation hydro run-of-river and poundage      0.1313
+generation other                                0.1318
+generation hydro water reservoir                0.1323
+generation solar                                0.1324
+generation nuclear                              0.1325</code></pre>
+</div>
+</div>
+<p>It seems that fossil gas and hard coal are the top 2 predictors, used to predict all by themselves of course. The best error we can get is 0.1176. Now lets try fitting with all of them, we want the really significant predictors, so the p-value cutoff will be at 0.01.</p>
+<div class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> statsmodels.api <span class="im">as</span> sm</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>X_train_with_const <span class="op">=</span> sm.add_constant(X_train)</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>model_stats <span class="op">=</span> sm.OLS(y_train, X_train_with_const).fit()</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>p_values <span class="op">=</span> model_stats.pvalues</span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>alpha <span class="op">=</span> <span class="fl">0.01</span></span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>significant_coeffs <span class="op">=</span> p_values[p_values <span class="op">&lt;</span> alpha]</span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Significant coefficients and their p-values:"</span>)</span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(significant_coeffs)</span>
+<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>()</span>
+<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Insignificant coefficients:"</span>)</span>
+<span id="cb19-16"><a href="#cb19-16" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(p_values[p_values <span class="op">&gt;</span> alpha])</span>
+<span id="cb19-17"><a href="#cb19-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-18"><a href="#cb19-18" aria-hidden="true" tabindex="-1"></a>X_test_with_const <span class="op">=</span> sm.add_constant(X_test)</span>
+<span id="cb19-19"><a href="#cb19-19" aria-hidden="true" tabindex="-1"></a>y_pred <span class="op">=</span> model_stats.predict(X_test_with_const)</span>
+<span id="cb19-20"><a href="#cb19-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-21"><a href="#cb19-21" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">""</span>)</span>
+<span id="cb19-22"><a href="#cb19-22" aria-hidden="true" tabindex="-1"></a>rmse <span class="op">=</span> np.sqrt(mean_squared_error(y_test, y_pred))</span>
+<span id="cb19-23"><a href="#cb19-23" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'Statsmodels RMSE: </span><span class="sc">{</span>rmse<span class="sc">}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Significant coefficients and their p-values:
+generation biomass                              7.075273e-83
+generation fossil gas                           1.515632e-82
+generation fossil hard coal                    9.741629e-164
+generation fossil oil                           1.104787e-13
+generation hydro pumped storage consumption    4.686107e-103
+generation hydro run-of-river and poundage      1.774009e-06
+generation other                                6.512099e-20
+generation other renewable                     1.825027e-305
+generation solar                                5.750305e-03
+generation waste                                3.688493e-11
+generation wind onshore                         1.256884e-09
+total load actual                               2.851242e-06
+dtype: float64
+
+Insignificant coefficients:
+const                                   0.608791
+generation fossil brown coal/lignite    0.666396
+generation hydro water reservoir        0.044185
+generation nuclear                      0.350767
+dtype: float64
+
+Statsmodels RMSE: 0.10527652567187645</code></pre>
+</div>
+</div>
+<p>We see that generation fossil brown coal, generation nuclear, and generation hydro water reservoir are not really correlated to price actual when fit with all the predictors. However, the rest of the predictors make it through. The error we get is 0.105, which is just a little lower than just using fossil gas as a predictor. Maybe we can do better. Let’s do backward selection for choosing our predictors better.</p>
+<div class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Backward Elimination</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> backward_elimination(X, y, significance_level<span class="op">=</span><span class="fl">0.01</span>):</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    num_features <span class="op">=</span> X.shape[<span class="dv">1</span>]</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(num_features, <span class="dv">0</span>, <span class="op">-</span><span class="dv">1</span>):</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>        X_with_const <span class="op">=</span> sm.add_constant(X)</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>        model <span class="op">=</span> sm.OLS(y, X_with_const).fit()</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>        p_values <span class="op">=</span> model.pvalues.iloc[<span class="dv">1</span>:]  <span class="co"># Exclude constant term</span></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>        max_p_value <span class="op">=</span> p_values.<span class="bu">max</span>()</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> max_p_value <span class="op">&gt;</span> significance_level:</span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>            max_p_value_index <span class="op">=</span> p_values.idxmax()</span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>            X <span class="op">=</span> X.drop(columns<span class="op">=</span>max_p_value_index)</span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>            <span class="cf">break</span></span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> X</span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a>X_train_backward <span class="op">=</span> backward_elimination(X_train, y_train)</span>
+<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-19"><a href="#cb21-19" aria-hidden="true" tabindex="-1"></a>model_lr <span class="op">=</span> LinearRegression()</span>
+<span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a>model_lr.fit(X_train_backward, y_train)</span>
+<span id="cb21-21"><a href="#cb21-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a>y_pred_lr <span class="op">=</span> model_lr.predict(X_test[X_train_backward.columns])</span>
+<span id="cb21-23"><a href="#cb21-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-24"><a href="#cb21-24" aria-hidden="true" tabindex="-1"></a>rmse_lr <span class="op">=</span> np.sqrt(mean_squared_error(y_test, y_pred_lr))</span>
+<span id="cb21-25"><a href="#cb21-25" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'Linear Regression RMSE: </span><span class="sc">{</span>rmse_lr<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb21-26"><a href="#cb21-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-27"><a href="#cb21-27" aria-hidden="true" tabindex="-1"></a>X_train_backward_with_const <span class="op">=</span> sm.add_constant(X_train_backward)</span>
+<span id="cb21-28"><a href="#cb21-28" aria-hidden="true" tabindex="-1"></a>model_lr_stats <span class="op">=</span> sm.OLS(y_train, X_train_backward_with_const).fit()</span>
+<span id="cb21-29"><a href="#cb21-29" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">Linear Regression Coefficients:"</span>)</span>
+<span id="cb21-30"><a href="#cb21-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-31"><a href="#cb21-31" aria-hidden="true" tabindex="-1"></a>backward_coef_names <span class="op">=</span> <span class="bu">zip</span>(X.columns, model_lr.coef_)</span>
+<span id="cb21-32"><a href="#cb21-32" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> column, coefficient <span class="kw">in</span> backward_coef_names:</span>
+<span id="cb21-33"><a href="#cb21-33" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>column<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>coefficient<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb21-34"><a href="#cb21-34" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb21-35"><a href="#cb21-35" aria-hidden="true" tabindex="-1"></a><span class="co"># print(model_lr.coef_)</span></span>
+<span id="cb21-36"><a href="#cb21-36" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">Linear Regression P-values:"</span>)</span>
+<span id="cb21-37"><a href="#cb21-37" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(model_lr_stats.pvalues)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Linear Regression RMSE: 0.10530293680985038
+
+Linear Regression Coefficients:
+generation biomass: 0.14506544285860482
+generation fossil brown coal/lignite: 0.19868867311438893
+generation fossil gas: 0.15222922849974962
+generation fossil hard coal: -0.057479172415512876
+generation fossil oil: -0.11486552480672783
+generation hydro pumped storage consumption: 0.030132095128287108
+generation hydro run-of-river and poundage: 0.04098105222780272
+generation hydro water reservoir: 0.3215163342525464
+generation nuclear: -0.046884934536481265
+generation other: 0.031012239700529704
+generation other renewable: 0.06883118396789902
+
+Linear Regression P-values:
+const                                           9.308600e-01
+generation biomass                              2.819414e-86
+generation fossil gas                          3.965385e-104
+generation fossil hard coal                    1.646394e-243
+generation fossil oil                           2.620893e-15
+generation hydro pumped storage consumption    1.372118e-108
+generation hydro run-of-river and poundage      6.927898e-12
+generation other                                7.473160e-20
+generation other renewable                      0.000000e+00
+generation waste                                3.150260e-13
+generation wind onshore                         2.054857e-10
+total load actual                               3.507323e-32
+dtype: float64</code></pre>
+</div>
+</div>
+<p>Very similar results to before, but a few additional predictors are eliminated. Nuclear, fossil brown coal, hydro water reservoir, generation solar do not make it through the backwards selection process, and we still keep a 0.105 RMSE. We will not try ridge regression to see if it helps.</p>
+<div class="cell" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> Ridge</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>ridge_model <span class="op">=</span> Ridge(alpha<span class="op">=</span><span class="fl">1.0</span>)</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>ridge_model.fit(X_train, y_train)</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Make predictions</span></span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>y_pred <span class="op">=</span> ridge_model.predict(X_test)</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Calculate RMSE</span></span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>rmse <span class="op">=</span> np.sqrt(mean_squared_error(y_test, y_pred))</span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"RMSE:"</span>, rmse)</span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Get coefficients from Ridge regression</span></span>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>ridge_coefficients <span class="op">=</span> pd.Series(ridge_model.coef_, index<span class="op">=</span>predictors)</span>
+<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Print coefficients</span></span>
+<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Coefficients:"</span>)</span>
+<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(ridge_coefficients)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>RMSE: 0.10527871627670903
+Coefficients:
+generation biomass                             0.142497
+generation fossil brown coal/lignite          -0.001286
+generation fossil gas                          0.205920
+generation fossil hard coal                    0.159236
+generation fossil oil                         -0.053722
+generation hydro pumped storage consumption   -0.117312
+generation hydro run-of-river and poundage     0.025850
+generation hydro water reservoir               0.012957
+generation nuclear                            -0.006537
+generation other                               0.041319
+generation other renewable                     0.322348
+generation solar                               0.008479
+generation waste                              -0.042427
+generation wind onshore                        0.041653
+total load actual                              0.051094
+dtype: float64</code></pre>
+</div>
+</div>
+<p>No improvement on RMSE, however, we see that with regularization, only some of the predictors keep their large coefficients. Fossil gas and renewables dominate the model when ridge regression is used.</p>
+<ol start="2" type="1">
+<li>SARIMAX</li>
+</ol>
+<p>Now let us try a little more complicated model, SARIMAX. This will try to take into account the seasonality of the data and make use of a moving average, which should be somewhat better than a boring linear regression. Lets do a grid search to see what parameters we can use.</p>
+<div class="cell" data-results="hide" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> statsmodels.tsa.statespace.sarimax <span class="im">import</span> SARIMAX</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>df_M <span class="op">=</span> df.resample(<span class="st">'ME'</span>).mean()</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>df_M <span class="op">=</span> df_M.asfreq(<span class="st">'ME'</span>)</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Define the target variable and predictors</span></span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>target_variable <span class="op">=</span> <span class="st">'price actual'</span></span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>exog_vars <span class="op">=</span> df_M.drop(columns<span class="op">=</span>[target_variable])</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Perform grid search for hyperparameter tuning</span></span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>p <span class="op">=</span> d <span class="op">=</span> q <span class="op">=</span> <span class="bu">range</span>(<span class="dv">0</span>, <span class="dv">2</span>)</span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>seasonal_p <span class="op">=</span> seasonal_d <span class="op">=</span> seasonal_q <span class="op">=</span> <span class="bu">range</span>(<span class="dv">0</span>, <span class="dv">2</span>)</span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>seasonal_s <span class="op">=</span> [<span class="dv">12</span>]  <span class="co"># Seasonal period (12 for monthly data)</span></span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Generate all combinations of p, d, q triplets</span></span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>pdq <span class="op">=</span> <span class="bu">list</span>(itertools.product(p, d, q))</span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a>seasonal_pdq <span class="op">=</span> <span class="bu">list</span>(itertools.product(seasonal_p, seasonal_d, seasonal_q, seasonal_s))</span>
+<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a>best_aic <span class="op">=</span> np.inf</span>
+<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>best_params <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a>best_seasonal_params <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb25-21"><a href="#cb25-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-22"><a href="#cb25-22" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> param <span class="kw">in</span> pdq:</span>
+<span id="cb25-23"><a href="#cb25-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> seasonal_param <span class="kw">in</span> seasonal_pdq:</span>
+<span id="cb25-24"><a href="#cb25-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-25"><a href="#cb25-25" aria-hidden="true" tabindex="-1"></a>        <span class="cf">try</span>:</span>
+<span id="cb25-26"><a href="#cb25-26" aria-hidden="true" tabindex="-1"></a>            model <span class="op">=</span> SARIMAX(df_M[target_variable],</span>
+<span id="cb25-27"><a href="#cb25-27" aria-hidden="true" tabindex="-1"></a>                            exog<span class="op">=</span>exog_vars,</span>
+<span id="cb25-28"><a href="#cb25-28" aria-hidden="true" tabindex="-1"></a>                            order<span class="op">=</span>param,</span>
+<span id="cb25-29"><a href="#cb25-29" aria-hidden="true" tabindex="-1"></a>                            seasonal_order<span class="op">=</span>seasonal_param,</span>
+<span id="cb25-30"><a href="#cb25-30" aria-hidden="true" tabindex="-1"></a>                            enforce_stationarity<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb25-31"><a href="#cb25-31" aria-hidden="true" tabindex="-1"></a>                            enforce_invertibility<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb25-32"><a href="#cb25-32" aria-hidden="true" tabindex="-1"></a>                            </span>
+<span id="cb25-33"><a href="#cb25-33" aria-hidden="true" tabindex="-1"></a>            results <span class="op">=</span> model.fit(disp<span class="op">=</span><span class="va">False</span>,maxiter<span class="op">=</span><span class="dv">300</span>)</span>
+<span id="cb25-34"><a href="#cb25-34" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb25-35"><a href="#cb25-35" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb25-36"><a href="#cb25-36" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> results.aic <span class="op">&lt;</span> best_aic:</span>
+<span id="cb25-37"><a href="#cb25-37" aria-hidden="true" tabindex="-1"></a>                best_aic <span class="op">=</span> results.aic</span>
+<span id="cb25-38"><a href="#cb25-38" aria-hidden="true" tabindex="-1"></a>                best_params <span class="op">=</span> param</span>
+<span id="cb25-39"><a href="#cb25-39" aria-hidden="true" tabindex="-1"></a>                best_seasonal_params <span class="op">=</span> seasonal_param</span>
+<span id="cb25-40"><a href="#cb25-40" aria-hidden="true" tabindex="-1"></a>        <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
+<span id="cb25-41"><a href="#cb25-41" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(e)</span>
+<span id="cb25-42"><a href="#cb25-42" aria-hidden="true" tabindex="-1"></a>            <span class="cf">continue</span></span>
+<span id="cb25-43"><a href="#cb25-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-44"><a href="#cb25-44" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'Best SARIMAX params: </span><span class="sc">{</span>best_params<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb25-45"><a href="#cb25-45" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'Best Seasonal params: </span><span class="sc">{</span>best_seasonal_params<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb25-46"><a href="#cb25-46" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'Best AIC: </span><span class="sc">{</span>best_aic<span class="sc">}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\tsa\statespace\sarimax.py:866: UserWarning: Too few observations to estimate starting parameters for seasonal ARMA. All parameters except for variances will be set to zeros.
+  warn('Too few observations to estimate starting parameters%s.'
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\tsa\statespace\sarimax.py:866: UserWarning: Too few observations to estimate starting parameters for seasonal ARMA. All parameters except for variances will be set to zeros.
+  warn('Too few observations to estimate starting parameters%s.'
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\tsa\statespace\sarimax.py:866: UserWarning: Too few observations to estimate starting parameters for seasonal ARMA. All parameters except for variances will be set to zeros.
+  warn('Too few observations to estimate starting parameters%s.'
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\tsa\statespace\sarimax.py:866: UserWarning: Too few observations to estimate starting parameters for seasonal ARMA. All parameters except for variances will be set to zeros.
+  warn('Too few observations to estimate starting parameters%s.'
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\tsa\statespace\sarimax.py:866: UserWarning: Too few observations to estimate starting parameters for seasonal ARMA. All parameters except for variances will be set to zeros.
+  warn('Too few observations to estimate starting parameters%s.'
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\tsa\statespace\sarimax.py:866: UserWarning: Too few observations to estimate starting parameters for seasonal ARMA. All parameters except for variances will be set to zeros.
+  warn('Too few observations to estimate starting parameters%s.'
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\tsa\statespace\sarimax.py:966: UserWarning: Non-stationary starting autoregressive parameters found. Using zeros as starting parameters.
+  warn('Non-stationary starting autoregressive parameters'
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\tsa\statespace\sarimax.py:966: UserWarning: Non-stationary starting autoregressive parameters found. Using zeros as starting parameters.
+  warn('Non-stationary starting autoregressive parameters'
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\tsa\statespace\sarimax.py:866: UserWarning: Too few observations to estimate starting parameters for seasonal ARMA. All parameters except for variances will be set to zeros.
+  warn('Too few observations to estimate starting parameters%s.'
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\tsa\statespace\sarimax.py:966: UserWarning: Non-stationary starting autoregressive parameters found. Using zeros as starting parameters.
+  warn('Non-stationary starting autoregressive parameters'
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\tsa\statespace\sarimax.py:966: UserWarning: Non-stationary starting autoregressive parameters found. Using zeros as starting parameters.
+  warn('Non-stationary starting autoregressive parameters'
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\tsa\statespace\sarimax.py:866: UserWarning: Too few observations to estimate starting parameters for seasonal ARMA. All parameters except for variances will be set to zeros.
+  warn('Too few observations to estimate starting parameters%s.'</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Best SARIMAX params: (1, 1, 1)
+Best Seasonal params: (0, 0, 0, 12)
+Best AIC: -171.47586967013655</code></pre>
+</div>
+</div>
+<p>Time to fit.</p>
+<div class="cell" data-execution_count="18">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>sarimax_model <span class="op">=</span> SARIMAX(df_M[target_variable],</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>                        exog<span class="op">=</span>exog_vars,</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>                        order<span class="op">=</span>best_params,</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>                        seasonal_order<span class="op">=</span>best_seasonal_params,</span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>                        enforce_stationarity<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>                        enforce_invertibility<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>sarimax_results <span class="op">=</span> sarimax_model.fit()</span>
+<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(sarimax_results.summary())</span>
+<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a>forecast_steps <span class="op">=</span> <span class="dv">12</span></span>
+<span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a>future_exog_vars <span class="op">=</span> exog_vars.iloc[<span class="op">-</span>forecast_steps:]</span>
+<span id="cb28-15"><a href="#cb28-15" aria-hidden="true" tabindex="-1"></a>exog_vars_clean <span class="op">=</span> exog_vars.dropna()</span>
+<span id="cb28-16"><a href="#cb28-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-17"><a href="#cb28-17" aria-hidden="true" tabindex="-1"></a>forecast <span class="op">=</span> sarimax_results.get_forecast(steps<span class="op">=</span>forecast_steps, exog<span class="op">=</span>future_exog_vars)</span>
+<span id="cb28-18"><a href="#cb28-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-19"><a href="#cb28-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-20"><a href="#cb28-20" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb28-21"><a href="#cb28-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-22"><a href="#cb28-22" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb28-23"><a href="#cb28-23" aria-hidden="true" tabindex="-1"></a>forecast_index <span class="op">=</span> pd.date_range(start<span class="op">=</span>df_M.index[<span class="op">-</span><span class="dv">1</span>], periods<span class="op">=</span>forecast_steps <span class="op">+</span> <span class="dv">1</span>, freq<span class="op">=</span><span class="st">'M'</span>)[<span class="dv">1</span>:]</span>
+<span id="cb28-24"><a href="#cb28-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-25"><a href="#cb28-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-26"><a href="#cb28-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-27"><a href="#cb28-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-28"><a href="#cb28-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-29"><a href="#cb28-29" aria-hidden="true" tabindex="-1"></a>forecast_df <span class="op">=</span> pd.DataFrame(forecast.predicted_mean, index<span class="op">=</span>forecast_index, columns<span class="op">=</span>[<span class="st">'Forecast'</span>])</span>
+<span id="cb28-30"><a href="#cb28-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-31"><a href="#cb28-31" aria-hidden="true" tabindex="-1"></a>forecast_df[<span class="st">'Forecast'</span>] <span class="op">=</span> forecast.predicted_mean</span>
+<span id="cb28-32"><a href="#cb28-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-33"><a href="#cb28-33" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot the original data and the forecast</span></span>
+<span id="cb28-34"><a href="#cb28-34" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">6</span>))</span>
+<span id="cb28-35"><a href="#cb28-35" aria-hidden="true" tabindex="-1"></a>plt.plot(df_M[target_variable], label<span class="op">=</span><span class="st">'Observed'</span>)</span>
+<span id="cb28-36"><a href="#cb28-36" aria-hidden="true" tabindex="-1"></a>plt.plot(forecast_df, label<span class="op">=</span><span class="st">'Forecast'</span>, color<span class="op">=</span><span class="st">'red'</span>)</span>
+<span id="cb28-37"><a href="#cb28-37" aria-hidden="true" tabindex="-1"></a>plt.fill_between(forecast_df.index,</span>
+<span id="cb28-38"><a href="#cb28-38" aria-hidden="true" tabindex="-1"></a>                 forecast.conf_int().iloc[:, <span class="dv">0</span>],</span>
+<span id="cb28-39"><a href="#cb28-39" aria-hidden="true" tabindex="-1"></a>                 forecast.conf_int().iloc[:, <span class="dv">1</span>],</span>
+<span id="cb28-40"><a href="#cb28-40" aria-hidden="true" tabindex="-1"></a>                 color<span class="op">=</span><span class="st">'pink'</span>, alpha<span class="op">=</span><span class="fl">0.7</span>)</span>
+<span id="cb28-41"><a href="#cb28-41" aria-hidden="true" tabindex="-1"></a>plt.legend()</span>
+<span id="cb28-42"><a href="#cb28-42" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                               SARIMAX Results                                
+==============================================================================
+Dep. Variable:           price actual   No. Observations:                   49
+Model:               SARIMAX(1, 1, 1)   Log Likelihood                  99.087
+Date:                Mon, 10 Jun 2024   AIC                           -162.175
+Time:                        18:40:13   BIC                           -129.259
+Sample:                    12-31-2014   HQIC                          -149.845
+                         - 12-31-2018                                         
+Covariance Type:                  opg                                         
+===============================================================================================================
+                                                  coef    std err          z      P&gt;|z|      [0.025      0.975]
+---------------------------------------------------------------------------------------------------------------
+generation biomass                              0.0750      0.192      0.390      0.697      -0.302       0.452
+generation fossil brown coal/lignite            0.1869      0.095      1.978      0.048       0.002       0.372
+generation fossil gas                           0.2856      0.303      0.942      0.346      -0.309       0.880
+generation fossil hard coal                     0.3307      0.141      2.344      0.019       0.054       0.607
+generation fossil oil                          -0.2021      0.214     -0.943      0.346      -0.622       0.218
+generation hydro pumped storage consumption    -0.0108      0.439     -0.025      0.980      -0.871       0.849
+generation hydro run-of-river and poundage     -0.0734      0.142     -0.519      0.604      -0.351       0.204
+generation hydro water reservoir               -0.0270      0.192     -0.141      0.888      -0.403       0.349
+generation nuclear                              0.2720      0.148      1.837      0.066      -0.018       0.562
+generation other                                0.0242      0.056      0.432      0.666      -0.086       0.134
+generation other renewable                      0.6822      0.383      1.780      0.075      -0.069       1.433
+generation solar                                0.0929      0.228      0.408      0.683      -0.354       0.539
+generation waste                               -0.2067      0.131     -1.575      0.115      -0.464       0.051
+generation wind onshore                         0.2754      0.253      1.090      0.276      -0.220       0.771
+total load actual                              -0.2018      0.351     -0.575      0.565      -0.889       0.486
+ar.L1                                          -0.8686      0.220     -3.954      0.000      -1.299      -0.438
+ma.L1                                           1.7159      1.222      1.404      0.160      -0.679       4.111
+sigma2                                          0.0003      0.000      0.719      0.472      -0.000       0.001
+===================================================================================
+Ljung-Box (L1) (Q):                   0.28   Jarque-Bera (JB):                 0.63
+Prob(Q):                              0.59   Prob(JB):                         0.73
+Heteroskedasticity (H):               1.08   Skew:                            -0.23
+Prob(H) (two-sided):                  0.89   Kurtosis:                         2.66
+===================================================================================
+
+Warnings:
+[1] Covariance matrix calculated using the outer product of gradients (complex-step).</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "
+C:\Users\merto\AppData\Local\Temp\ipykernel_15684\692181819.py:23: FutureWarning: 'M' is deprecated and will be removed in a future version, please use 'ME' instead.
+  forecast_index = pd.date_range(start=df_M.index[-1], periods=forecast_steps + 1, freq='M')[1:]</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<p><img src="report_files/figure-html/cell-19-output-3.png" width="794" height="485"></p>
+</div>
+</div>
+<p>This is a future forecast. We do not have the data for the electricty price in 2019. So we have no way of testing this. However, it sure looks pretty convincing. Now lets train with data up to 2018, and then predict the prices in 2018, then we can calculate an RMSE and see how it is doing.</p>
+<div class="cell" data-execution_count="19">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>train_data <span class="op">=</span> df_M.loc[<span class="st">'2015-01'</span>:<span class="st">'2017-12'</span>]</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>test_data <span class="op">=</span> df_M.loc[<span class="st">'2018-01'</span>:<span class="st">'2018-12'</span>]</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>sarimax_model <span class="op">=</span> SARIMAX(train_data[target_variable],</span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>                        exog<span class="op">=</span>exog_vars.loc[train_data.index],</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>                        order<span class="op">=</span>(<span class="dv">1</span>,<span class="dv">1</span>,<span class="dv">1</span>),</span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>                        seasonal_order<span class="op">=</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">12</span>),</span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>                        enforce_stationarity<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>                        enforce_invertibility<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a>sarimax_results <span class="op">=</span> sarimax_model.fit()</span>
+<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-13"><a href="#cb31-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-14"><a href="#cb31-14" aria-hidden="true" tabindex="-1"></a>forecast_steps <span class="op">=</span> <span class="bu">len</span>(test_data)</span>
+<span id="cb31-15"><a href="#cb31-15" aria-hidden="true" tabindex="-1"></a>future_exog_vars <span class="op">=</span> exog_vars.loc[test_data.index]</span>
+<span id="cb31-16"><a href="#cb31-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-17"><a href="#cb31-17" aria-hidden="true" tabindex="-1"></a>forecast <span class="op">=</span> sarimax_results.get_forecast(steps<span class="op">=</span>forecast_steps, exog<span class="op">=</span>future_exog_vars)</span>
+<span id="cb31-18"><a href="#cb31-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-19"><a href="#cb31-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-20"><a href="#cb31-20" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb31-21"><a href="#cb31-21" aria-hidden="true" tabindex="-1"></a>forecast_index <span class="op">=</span> test_data.index</span>
+<span id="cb31-22"><a href="#cb31-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-23"><a href="#cb31-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-24"><a href="#cb31-24" aria-hidden="true" tabindex="-1"></a>forecast_df <span class="op">=</span> pd.DataFrame(forecast.predicted_mean, index<span class="op">=</span>forecast_index, columns<span class="op">=</span>[<span class="st">'Forecast'</span>])</span>
+<span id="cb31-25"><a href="#cb31-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-26"><a href="#cb31-26" aria-hidden="true" tabindex="-1"></a>forecast_df[<span class="st">"Forecast"</span>] <span class="op">=</span> forecast.predicted_mean</span>
+<span id="cb31-27"><a href="#cb31-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-28"><a href="#cb31-28" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">6</span>))</span>
+<span id="cb31-29"><a href="#cb31-29" aria-hidden="true" tabindex="-1"></a>plt.plot(df_M[target_variable], label<span class="op">=</span><span class="st">'Observed'</span>)</span>
+<span id="cb31-30"><a href="#cb31-30" aria-hidden="true" tabindex="-1"></a>plt.plot(forecast_df, label<span class="op">=</span><span class="st">'Forecast'</span>, color<span class="op">=</span><span class="st">'red'</span>)</span>
+<span id="cb31-31"><a href="#cb31-31" aria-hidden="true" tabindex="-1"></a>plt.fill_between(forecast_df.index,</span>
+<span id="cb31-32"><a href="#cb31-32" aria-hidden="true" tabindex="-1"></a>                 forecast.conf_int().iloc[:, <span class="dv">0</span>],</span>
+<span id="cb31-33"><a href="#cb31-33" aria-hidden="true" tabindex="-1"></a>                 forecast.conf_int().iloc[:, <span class="dv">1</span>],</span>
+<span id="cb31-34"><a href="#cb31-34" aria-hidden="true" tabindex="-1"></a>                 color<span class="op">=</span><span class="st">'pink'</span>, alpha<span class="op">=</span><span class="fl">0.7</span>)</span>
+<span id="cb31-35"><a href="#cb31-35" aria-hidden="true" tabindex="-1"></a>plt.legend()</span>
+<span id="cb31-36"><a href="#cb31-36" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>C:\Users\merto\Documents\.virtualenvs\r-reticulate\Lib\site-packages\statsmodels\base\model.py:607: ConvergenceWarning: Maximum Likelihood optimization failed to converge. Check mle_retvals
+  warnings.warn("Maximum Likelihood optimization failed to "</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<p><img src="report_files/figure-html/cell-20-output-2.png" width="794" height="485"></p>
+</div>
+</div>
+<p>Nice. While it isn’t spot on, this is a very good prediction that captures the trend and the seasonality, and the real values are within the interval. It is not perfect however, lets see the error.</p>
+<div class="cell" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>mse <span class="op">=</span> mean_squared_error(df_M[target_variable][<span class="op">-</span>forecast_steps:], forecast_df[<span class="st">'Forecast'</span>])</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>rmse <span class="op">=</span> np.sqrt(mse)</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"RMSE:"</span>, rmse)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>RMSE: 0.09094292865145273</code></pre>
+</div>
+</div>
+<p>It is definitely better than linear regression, and can be improved with further work.</p>
+<ol start="3" type="1">
+<li>Boosting - XGBoost</li>
+</ol>
+<p>To bring out the big guns, we will lastly use boosted trees, specifically XGBoost.</p>
+<div class="cell" data-execution_count="21">
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> xgboost <span class="im">as</span> xgb</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>train_dmatrix <span class="op">=</span> xgb.DMatrix(data<span class="op">=</span>X_train, label<span class="op">=</span>y_train)</span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>test_dmatrix <span class="op">=</span> xgb.DMatrix(data<span class="op">=</span>X_test, label<span class="op">=</span>y_test)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell" data-execution_count="22">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Define the parameters for XGBoost</span></span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> {</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">'objective'</span>: <span class="st">'reg:squarederror'</span>,  <span class="co"># for regression</span></span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">'eval_metric'</span>: <span class="st">'rmse'</span>,            <span class="co"># evaluation metric</span></span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">'max_depth'</span>: <span class="dv">5</span>,                   <span class="co"># maximum depth of a tree</span></span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">'eta'</span>: <span class="fl">0.10</span>,                       <span class="co"># learning rate</span></span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">'subsample'</span>: <span class="fl">0.8</span>,                 <span class="co"># fraction of samples to be used for each tree</span></span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">'colsample_bytree'</span>: <span class="fl">0.8</span>           <span class="co"># fraction of features to be used for each tree</span></span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Train the XGBoost model</span></span>
+<span id="cb36-12"><a href="#cb36-12" aria-hidden="true" tabindex="-1"></a>num_boost_round <span class="op">=</span> <span class="dv">100</span></span>
+<span id="cb36-13"><a href="#cb36-13" aria-hidden="true" tabindex="-1"></a>xgboost_model <span class="op">=</span> xgb.train(params, train_dmatrix, num_boost_round)</span>
+<span id="cb36-14"><a href="#cb36-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-15"><a href="#cb36-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Make predictions</span></span>
+<span id="cb36-16"><a href="#cb36-16" aria-hidden="true" tabindex="-1"></a>y_pred <span class="op">=</span> xgboost_model.predict(test_dmatrix)</span>
+<span id="cb36-17"><a href="#cb36-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-18"><a href="#cb36-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Calculate RMSE</span></span>
+<span id="cb36-19"><a href="#cb36-19" aria-hidden="true" tabindex="-1"></a>rmse <span class="op">=</span> np.sqrt(mean_squared_error(y_test, y_pred))</span>
+<span id="cb36-20"><a href="#cb36-20" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'RMSE: </span><span class="sc">{</span>rmse<span class="sc">:.4f}</span><span class="ss">'</span>)</span>
+<span id="cb36-21"><a href="#cb36-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-22"><a href="#cb36-22" aria-hidden="true" tabindex="-1"></a><span class="co"># Print the feature importances</span></span>
+<span id="cb36-23"><a href="#cb36-23" aria-hidden="true" tabindex="-1"></a>feature_importances <span class="op">=</span> xgboost_model.get_score(importance_type<span class="op">=</span><span class="st">'weight'</span>)</span>
+<span id="cb36-24"><a href="#cb36-24" aria-hidden="true" tabindex="-1"></a>sorted_importances <span class="op">=</span> <span class="bu">sorted</span>(feature_importances.items(), key<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="dv">1</span>], reverse<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb36-25"><a href="#cb36-25" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Feature Importances:"</span>)</span>
+<span id="cb36-26"><a href="#cb36-26" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> feature, importance <span class="kw">in</span> sorted_importances:</span>
+<span id="cb36-27"><a href="#cb36-27" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>feature<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>importance<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb36-28"><a href="#cb36-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-29"><a href="#cb36-29" aria-hidden="true" tabindex="-1"></a><span class="co"># Optional: Plot feature importances</span></span>
+<span id="cb36-30"><a href="#cb36-30" aria-hidden="true" tabindex="-1"></a>xgb.plot_importance(xgboost_model)</span>
+<span id="cb36-31"><a href="#cb36-31" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>RMSE: 0.0757
+Feature Importances:
+generation nuclear: 386.0
+generation hydro run-of-river and poundage: 287.0
+generation biomass: 246.0
+generation fossil hard coal: 234.0
+generation other renewable: 229.0
+generation waste: 219.0
+generation other: 214.0
+generation fossil oil: 193.0
+generation fossil gas: 181.0
+generation wind onshore: 139.0
+generation fossil brown coal/lignite: 138.0
+generation hydro water reservoir: 138.0
+generation solar: 123.0
+total load actual: 123.0
+generation hydro pumped storage consumption: 86.0</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<p><img src="report_files/figure-html/cell-23-output-2.png" width="887" height="449"></p>
+</div>
+</div>
+<p>RMSE is greatly improved from 0.105 to 0.0757. However, we can still optimize our hyperparameters. Let’s do a grid search.</p>
+<div class="cell" data-execution_count="23">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> train_test_split, GridSearchCV</span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>xgboost_model <span class="op">=</span> xgb.XGBRegressor(objective<span class="op">=</span><span class="st">'reg:squarederror'</span>)</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Define the parameter grid</span></span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>param_grid <span class="op">=</span> {</span>
+<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">'n_estimators'</span>: [<span class="dv">50</span>, <span class="dv">100</span>, <span class="dv">200</span>, <span class="dv">400</span>],  <span class="co"># Number of boosting rounds</span></span>
+<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">'max_depth'</span>: [<span class="dv">3</span>, <span class="dv">5</span>, <span class="dv">7</span>, <span class="dv">10</span>],          <span class="co"># Maximum depth of a tree</span></span>
+<span id="cb38-8"><a href="#cb38-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">'learning_rate'</span>: [<span class="fl">0.01</span>, <span class="fl">0.1</span>, <span class="fl">0.2</span>],  <span class="co"># Learning rate (eta)</span></span>
+<span id="cb38-9"><a href="#cb38-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">'subsample'</span>: [<span class="fl">0.8</span>, <span class="fl">1.0</span>],         <span class="co"># Subsample ratio of the training instances</span></span>
+<span id="cb38-10"><a href="#cb38-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">'colsample_bytree'</span>: [<span class="fl">0.8</span>, <span class="fl">1.0</span>]   <span class="co"># Subsample ratio of columns when constructing each tree</span></span>
+<span id="cb38-11"><a href="#cb38-11" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb38-12"><a href="#cb38-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-13"><a href="#cb38-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Perform grid search</span></span>
+<span id="cb38-14"><a href="#cb38-14" aria-hidden="true" tabindex="-1"></a>grid_search <span class="op">=</span> GridSearchCV(estimator<span class="op">=</span>xgboost_model, param_grid<span class="op">=</span>param_grid, cv<span class="op">=</span><span class="dv">3</span>, scoring<span class="op">=</span><span class="st">'neg_mean_squared_error'</span>, verbose<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb38-15"><a href="#cb38-15" aria-hidden="true" tabindex="-1"></a>grid_search.fit(X_train, y_train)</span>
+<span id="cb38-16"><a href="#cb38-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-17"><a href="#cb38-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Get the best parameters and best model</span></span>
+<span id="cb38-18"><a href="#cb38-18" aria-hidden="true" tabindex="-1"></a>best_params <span class="op">=</span> grid_search.best_params_</span>
+<span id="cb38-19"><a href="#cb38-19" aria-hidden="true" tabindex="-1"></a>best_model <span class="op">=</span> grid_search.best_estimator_</span>
+<span id="cb38-20"><a href="#cb38-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-21"><a href="#cb38-21" aria-hidden="true" tabindex="-1"></a><span class="co"># Print the best parameters</span></span>
+<span id="cb38-22"><a href="#cb38-22" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'Best parameters: </span><span class="sc">{</span>best_params<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb38-23"><a href="#cb38-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-24"><a href="#cb38-24" aria-hidden="true" tabindex="-1"></a><span class="co"># Make predictions with the best model</span></span>
+<span id="cb38-25"><a href="#cb38-25" aria-hidden="true" tabindex="-1"></a>y_pred <span class="op">=</span> best_model.predict(X_test)</span>
+<span id="cb38-26"><a href="#cb38-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-27"><a href="#cb38-27" aria-hidden="true" tabindex="-1"></a><span class="co"># Calculate RMSE</span></span>
+<span id="cb38-28"><a href="#cb38-28" aria-hidden="true" tabindex="-1"></a>rmse <span class="op">=</span> np.sqrt(mean_squared_error(y_test, y_pred))</span>
+<span id="cb38-29"><a href="#cb38-29" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'RMSE: </span><span class="sc">{</span>rmse<span class="sc">:.4f}</span><span class="ss">'</span>)</span>
+<span id="cb38-30"><a href="#cb38-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-31"><a href="#cb38-31" aria-hidden="true" tabindex="-1"></a><span class="co"># Print the feature importances</span></span>
+<span id="cb38-32"><a href="#cb38-32" aria-hidden="true" tabindex="-1"></a>feature_importances <span class="op">=</span> best_model.get_booster().get_score(importance_type<span class="op">=</span><span class="st">'weight'</span>)</span>
+<span id="cb38-33"><a href="#cb38-33" aria-hidden="true" tabindex="-1"></a>sorted_importances <span class="op">=</span> <span class="bu">sorted</span>(feature_importances.items(), key<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="dv">1</span>], reverse<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb38-34"><a href="#cb38-34" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Feature Importances:"</span>)</span>
+<span id="cb38-35"><a href="#cb38-35" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> feature, importance <span class="kw">in</span> sorted_importances:</span>
+<span id="cb38-36"><a href="#cb38-36" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>feature<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>importance<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb38-37"><a href="#cb38-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-38"><a href="#cb38-38" aria-hidden="true" tabindex="-1"></a><span class="co"># Optional: Plot feature importances</span></span>
+<span id="cb38-39"><a href="#cb38-39" aria-hidden="true" tabindex="-1"></a>xgb.plot_importance(best_model)</span>
+<span id="cb38-40"><a href="#cb38-40" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Fitting 3 folds for each of 192 candidates, totalling 576 fits
+Best parameters: {'colsample_bytree': 0.8, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 400, 'subsample': 0.8}
+RMSE: 0.0440
+Feature Importances:
+generation biomass: 24444.0
+generation fossil gas: 17230.0
+generation fossil hard coal: 15013.0
+generation fossil oil: 14064.0
+generation fossil brown coal/lignite: 13978.0
+generation hydro run-of-river and poundage: 13479.0
+generation nuclear: 13120.0
+generation solar: 11935.0
+generation wind onshore: 11710.0
+generation hydro water reservoir: 11569.0
+generation waste: 10622.0
+total load actual: 10263.0
+generation other renewable: 9475.0
+generation hydro pumped storage consumption: 8399.0
+generation other: 8355.0</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<p><img src="report_files/figure-html/cell-24-output-2.png" width="894" height="449"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="24">
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>rmse <span class="op">=</span> np.sqrt(mean_squared_error(y_test, y_pred))</span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'RMSE: </span><span class="sc">{</span>rmse<span class="sc">:.4f}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>RMSE: 0.0440</code></pre>
+</div>
+</div>
+<p>With optimized hyperparameters, we get RMSE of 0.0440. This is less than half the error of a linear regression fit. We also see that biomass, fossil gas, and hard coal are the leading important features in the prediction.</p>
+<p>This is all good, and the error is low. However, it is not the same as forecasting. We are randomly picking from the data for training and testing. For a time series, we will have a series of continous data, so we should train with 2015 to 2017 data and try to predict the 2018 data like we did in SARIMAX.</p>
+<div class="cell" data-execution_count="25">
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> xgboost <span class="im">import</span> XGBRegressor, plot_importance</span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>train_data <span class="op">=</span> df.loc[<span class="st">'2015-01-01'</span>:<span class="st">'2017-12-31'</span>]</span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>test_data <span class="op">=</span> df.loc[<span class="st">'2018-01-01'</span>:<span class="st">'2018-12-31'</span>]</span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a>train_exog <span class="op">=</span> train_data.drop(columns<span class="op">=</span>[<span class="st">"price actual"</span>])</span>
+<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a>test_exog <span class="op">=</span> test_data.drop(columns<span class="op">=</span>[<span class="st">"price actual"</span>])</span>
+<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-9"><a href="#cb42-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-10"><a href="#cb42-10" aria-hidden="true" tabindex="-1"></a>param_grid <span class="op">=</span> {</span>
+<span id="cb42-11"><a href="#cb42-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">'n_estimators'</span>: [<span class="dv">50</span>, <span class="dv">100</span>, <span class="dv">200</span>, <span class="dv">400</span>],  </span>
+<span id="cb42-12"><a href="#cb42-12" aria-hidden="true" tabindex="-1"></a>    <span class="st">'max_depth'</span>: [<span class="dv">3</span>, <span class="dv">5</span>, <span class="dv">7</span>, <span class="dv">10</span>],          </span>
+<span id="cb42-13"><a href="#cb42-13" aria-hidden="true" tabindex="-1"></a>    <span class="st">'learning_rate'</span>: [<span class="fl">0.01</span>, <span class="fl">0.1</span>, <span class="fl">0.2</span>],    </span>
+<span id="cb42-14"><a href="#cb42-14" aria-hidden="true" tabindex="-1"></a>    <span class="st">'subsample'</span>: [<span class="fl">0.8</span>, <span class="fl">1.0</span>],              </span>
+<span id="cb42-15"><a href="#cb42-15" aria-hidden="true" tabindex="-1"></a>    <span class="st">'colsample_bytree'</span>: [<span class="fl">0.8</span>, <span class="fl">1.0</span>]        </span>
+<span id="cb42-16"><a href="#cb42-16" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb42-17"><a href="#cb42-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-18"><a href="#cb42-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-19"><a href="#cb42-19" aria-hidden="true" tabindex="-1"></a>xgboost_model <span class="op">=</span> XGBRegressor(objective<span class="op">=</span><span class="st">'reg:squarederror'</span>)</span>
+<span id="cb42-20"><a href="#cb42-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-21"><a href="#cb42-21" aria-hidden="true" tabindex="-1"></a>grid_search <span class="op">=</span> GridSearchCV(estimator<span class="op">=</span>xgboost_model, param_grid<span class="op">=</span>param_grid, cv<span class="op">=</span><span class="dv">3</span>, scoring<span class="op">=</span><span class="st">'neg_mean_squared_error'</span>, verbose<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb42-22"><a href="#cb42-22" aria-hidden="true" tabindex="-1"></a>grid_search.fit(train_exog, train_data[target_variable])</span>
+<span id="cb42-23"><a href="#cb42-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-24"><a href="#cb42-24" aria-hidden="true" tabindex="-1"></a>best_params <span class="op">=</span> grid_search.best_params_</span>
+<span id="cb42-25"><a href="#cb42-25" aria-hidden="true" tabindex="-1"></a>best_model <span class="op">=</span> grid_search.best_estimator_</span>
+<span id="cb42-26"><a href="#cb42-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-27"><a href="#cb42-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-28"><a href="#cb42-28" aria-hidden="true" tabindex="-1"></a>predictions <span class="op">=</span> best_model.predict(test_exog)</span>
+<span id="cb42-29"><a href="#cb42-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-30"><a href="#cb42-30" aria-hidden="true" tabindex="-1"></a>rmse <span class="op">=</span> np.sqrt(mean_squared_error(test_data[target_variable], predictions))</span>
+<span id="cb42-31"><a href="#cb42-31" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'RMSE: </span><span class="sc">{</span>rmse<span class="sc">:.4f}</span><span class="ss">'</span>)</span>
+<span id="cb42-32"><a href="#cb42-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-33"><a href="#cb42-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-34"><a href="#cb42-34" aria-hidden="true" tabindex="-1"></a>feature_importances <span class="op">=</span> best_model.get_booster().get_score(importance_type<span class="op">=</span><span class="st">'weight'</span>)</span>
+<span id="cb42-35"><a href="#cb42-35" aria-hidden="true" tabindex="-1"></a>sorted_importances <span class="op">=</span> <span class="bu">sorted</span>(feature_importances.items(), key<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="dv">1</span>], reverse<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb42-36"><a href="#cb42-36" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Feature Importances:"</span>)</span>
+<span id="cb42-37"><a href="#cb42-37" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> feature, importance <span class="kw">in</span> sorted_importances:</span>
+<span id="cb42-38"><a href="#cb42-38" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>feature<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>importance<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb42-39"><a href="#cb42-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-40"><a href="#cb42-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-41"><a href="#cb42-41" aria-hidden="true" tabindex="-1"></a>plot_importance(best_model)</span>
+<span id="cb42-42"><a href="#cb42-42" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
+<span id="cb42-43"><a href="#cb42-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-44"><a href="#cb42-44" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">6</span>))</span>
+<span id="cb42-45"><a href="#cb42-45" aria-hidden="true" tabindex="-1"></a>plt.plot(test_data[target_variable], label<span class="op">=</span><span class="st">'Actual'</span>)</span>
+<span id="cb42-46"><a href="#cb42-46" aria-hidden="true" tabindex="-1"></a>plt.plot(test_data.index, predictions, label<span class="op">=</span><span class="st">'Predicted'</span>, color<span class="op">=</span><span class="st">'red'</span>)</span>
+<span id="cb42-47"><a href="#cb42-47" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'Date'</span>)</span>
+<span id="cb42-48"><a href="#cb42-48" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">'Value'</span>)</span>
+<span id="cb42-49"><a href="#cb42-49" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">'XGBoost Model Predictions for 2018'</span>)</span>
+<span id="cb42-50"><a href="#cb42-50" aria-hidden="true" tabindex="-1"></a>plt.legend()</span>
+<span id="cb42-51"><a href="#cb42-51" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Fitting 3 folds for each of 192 candidates, totalling 576 fits
+RMSE: 0.1325
+Feature Importances:
+generation nuclear: 102.0
+generation hydro run-of-river and poundage: 71.0
+generation waste: 59.0
+generation fossil gas: 57.0
+generation fossil hard coal: 56.0
+generation other renewable: 55.0
+generation other: 48.0
+total load actual: 42.0
+generation biomass: 40.0
+generation hydro water reservoir: 34.0
+generation fossil brown coal/lignite: 33.0
+generation fossil oil: 33.0
+generation hydro pumped storage consumption: 28.0
+generation solar: 25.0
+generation wind onshore: 15.0</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<p><img src="report_files/figure-html/cell-26-output-2.png" width="887" height="449"></p>
+</div>
+<div class="cell-output cell-output-display">
+<p><img src="report_files/figure-html/cell-26-output-3.png" width="812" height="523"></p>
+</div>
+</div>
+<div class="cell" data-execution_count="26">
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>rmse <span class="op">=</span> np.sqrt(mean_squared_error(test_data[target_variable], predictions))</span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'RMSE: </span><span class="sc">{</span>rmse<span class="sc">:.4f}</span><span class="ss">'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>RMSE: 0.1325</code></pre>
+</div>
+</div>
+<p>We can see that when it is used for time series forecasting, it does do worse than an ARIMA model.</p>
+</section>
+<section id="results-and-analysis" class="level2">
+<h2 class="anchored" data-anchor-id="results-and-analysis">Results and Analysis</h2>
+<p>As a result of our models and analysis, we can see that the best way to predict the electricty price for a day given the energy generation amount is with XGBoost. The method yielded a low error of 0.044, and is very easily and speedily trained with the little data we have. However, it is also the case that the very same model performed poorly when asked to forecast a full year given the data of the previous years. The reason for this is unknown.</p>
+<p>When it comes to forecasting a long time period, the SARIMAX model performed nicely. With an RMSE of 0.089, it performed better than linear regression models, even despite having only 3 years of data to learn from. It is very likely that the model would have improved greatly if it has a few more years of data.</p>
+<p>The linear regression models left a lot to desire, which was exactly what one would expect when working with seasonal data. Their error wasn’t terrible because even though the price has seasonality, it roughly osciallates around a mean, and just has a slight slope over the years. So a straight line can at least catch that and always preserve an ok performance.</p>
+<p>Through the boosted tree and linear regression models, we have seen a couple of predictors usually occupy the top spot. We can use the coefficients of linear regression models because they have been normalized to be in the same range of 0 to 1. Meaning the coefficients represent the importance of their predictor, even if to at least a limited extent. Generation of electricity from biomass, fossil Gas, fossil coal, nuclear, and renewable sources showed up at the top the most often in our linear regression and XGBoost models.</p>
+</section>
+<section id="discussion-and-conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="discussion-and-conclusion">Discussion and Conclusion</h2>
+<p>Time series forecasting is a tricky topic. Time changes everything, and not everything can be explained with trend, seasonality, and some randomness. While many other submodels can be tried with different subsets of predictors and other hyperparameters, this gives us a nice idea on what our options are and how they perform on the limited data we had. It does look like SARIMAX is a very good tool to utilize when forecasting is to be done.</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
