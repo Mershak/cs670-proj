@@ -557,6 +557,9 @@ RMSE is greatly improved from 0.105 to 0.0757. However, we can still optimize ou
 
 ```{python}
 from sklearn.model_selection import train_test_split, GridSearchCV
+```
+
+```{python}
 xgboost_model = xgb.XGBRegressor(objective='reg:squarederror')
 
 # Define the parameter grid
@@ -666,11 +669,124 @@ rmse = np.sqrt(mean_squared_error(test_data[target_variable], predictions))
 print(f'RMSE: {rmse:.4f}')
 ```
 
-We can see that when it is used for time series forecasting, it does do worse than an ARIMA model.
+We can see that when it is used for time series forecasting, it does do worse than an ARIMA model. We can play with it a little more, lets give years 2015,2016, and 2018 as train data, and test it out on 2017.
+
+```{python}
+from xgboost import XGBRegressor, plot_importance
+train_data = df[(df.index >= '2015-01-01') & (df.index <= '2016-12-31') | (df.index >= '2018-01-01') & (df.index <= '2018-12-31')]
+test_data = df[(df.index >= '2017-01-01') & (df.index <= '2017-12-31')]
+
+
+train_exog = train_data.drop(columns=["price actual"])
+test_exog = test_data.drop(columns=["price actual"])
+
+
+param_grid = {
+    'n_estimators': [50, 100, 200, 400],  
+    'max_depth': [3, 5, 7, 10],          
+    'learning_rate': [0.01, 0.1, 0.2],    
+    'subsample': [0.8, 1.0],              
+    'colsample_bytree': [0.8, 1.0]        
+}
+
+
+xgboost_model = XGBRegressor(objective='reg:squarederror')
+
+grid_search = GridSearchCV(estimator=xgboost_model, param_grid=param_grid, cv=3, scoring='neg_mean_squared_error', verbose=1)
+grid_search.fit(train_exog, train_data[target_variable])
+
+best_params = grid_search.best_params_
+best_model = grid_search.best_estimator_
+
+
+predictions = best_model.predict(test_exog)
+
+rmse = np.sqrt(mean_squared_error(test_data[target_variable], predictions))
+print(f'RMSE: {rmse:.4f}')
+
+
+feature_importances = best_model.get_booster().get_score(importance_type='weight')
+sorted_importances = sorted(feature_importances.items(), key=lambda x: x[1], reverse=True)
+print("Feature Importances:")
+for feature, importance in sorted_importances:
+    print(f"{feature}: {importance}")
+
+
+plot_importance(best_model)
+plt.show()
+
+plt.figure(figsize=(10, 6))
+plt.plot(test_data[target_variable], label='Actual')
+plt.plot(test_data.index, predictions, label='Predicted', color='red')
+plt.xlabel('Date')
+plt.ylabel('Value')
+plt.title('XGBoost Model Predictions for 2018')
+plt.legend()
+plt.show()
+```
+
+RMSE of 0.104, just like the linear regression models, it also looks like a straight line too. One other thing we can test is shuffling the train set, maybe that helped when we had 0.047 RMSE, is was a shuffled train/test separation.
+
+```{python}
+from xgboost import XGBRegressor, plot_importance
+train_data = df[(df.index >= '2015-01-01') & (df.index <= '2016-12-31') | (df.index >= '2018-01-01') & (df.index <= '2018-12-31')]
+test_data = df[(df.index >= '2017-01-01') & (df.index <= '2017-12-31')]
+
+train_data = train_data.sample(frac=1, random_state=42)
+
+train_exog = train_data.drop(columns=["price actual"])
+test_exog = test_data.drop(columns=["price actual"])
+
+
+param_grid = {
+    'n_estimators': [50, 100, 200, 400],  
+    'max_depth': [3, 5, 7, 10],          
+    'learning_rate': [0.01, 0.1, 0.2],    
+    'subsample': [0.8, 1.0],              
+    'colsample_bytree': [0.8, 1.0]        
+}
+
+
+xgboost_model = XGBRegressor(objective='reg:squarederror')
+
+grid_search = GridSearchCV(estimator=xgboost_model, param_grid=param_grid, cv=3, scoring='neg_mean_squared_error', verbose=1)
+grid_search.fit(train_exog, train_data[target_variable])
+
+best_params = grid_search.best_params_
+best_model = grid_search.best_estimator_
+
+
+predictions = best_model.predict(test_exog)
+
+rmse = np.sqrt(mean_squared_error(test_data[target_variable], predictions))
+print(f'RMSE: {rmse:.4f}')
+
+
+feature_importances = best_model.get_booster().get_score(importance_type='weight')
+sorted_importances = sorted(feature_importances.items(), key=lambda x: x[1], reverse=True)
+print("Feature Importances:")
+for feature, importance in sorted_importances:
+    print(f"{feature}: {importance}")
+
+
+plot_importance(best_model)
+plt.show()
+
+plt.figure(figsize=(10, 6))
+plt.plot(test_data[target_variable], label='Actual')
+plt.plot(test_data.index, predictions, label='Predicted', color='red')
+plt.xlabel('Date')
+plt.ylabel('Value')
+plt.title('XGBoost Model Predictions for 2018')
+plt.legend()
+plt.show()
+```
+
+It looks like it just got a little braver with its flexibility, but overall the average errors is still the same around 0.105.
 
 ## Results and Analysis
 
-As a result of our models and analysis, we can see that the best way to predict the electricty price for a day given the energy generation amount is with XGBoost. The method yielded a low error of 0.044, and is very easily and speedily trained with the little data we have. However, it is also the case that the very same model performed poorly when asked to forecast a full year given the data of the previous years. The reason for this is unknown.
+As a result of our models and analysis, we can see that the best way to predict the electricty price for a day given the energy generation amount is with XGBoost. The method yielded a low error of 0.044, and is very easily and speedily trained with the little data we have. However, it is also the case that the very same model performed poorly when asked to forecast a full year given the data of the previous years. The reason for this is unknown. We tried using a middle year as the test data, which did perform a little bit better but very similarly to a linear regression model both in terms of prediction and RMSE accuracy. Then we also tried shuffling the train data to imitate the first 0.044 RMSE model, to no avail. We have been unable to reproduce the performance of the random train and random test XGBoost model with our forecasting models.
 
 When it comes to forecasting a long time period, the SARIMAX model performed nicely. With an RMSE of 0.089, it performed better than linear regression models, even despite having only 3 years of data to learn from. It is very likely that the model would have improved greatly if it has a few more years of data.
 
@@ -681,3 +797,7 @@ Through the boosted tree and linear regression models, we have seen a couple of 
 ## Discussion and Conclusion
 
 Time series forecasting is a tricky topic. Time changes everything, and not everything can be explained with trend, seasonality, and some randomness. While many other submodels can be tried with different subsets of predictors and other hyperparameters, this gives us a nice idea on what our options are and how they perform on the limited data we had. It does look like SARIMAX is a very good tool to utilize when forecasting is to be done.
+
+## Impact
+
+It'd bring me joy to say that my work in this project would be beneficial to people. However, the act of predicting energy prices is a very very old practice that has been sculpted and worked on endlessly through years. A lot of money depends on it after all. And this meager project with limited knowledge of statistics and machine learning can't possibly overtake the existing methods of prediction. What this project could be useful is for other students like me who have an idea on what is the best practice, but just don't know why it is that way. I already knew that I very likely couldn't train a model that would predict satisfactorily, but trying and adjusting methodologies and models from ground up teaches things that can't be learned by listening to what the best way is. Sometimes you have to go in blindly and figure things out. Now I have an idea on how a few different approaches perform on time series forecasting, and anyone who doesn't know much about the topic can read this paper and see the struggles of working with such data. It was definitely impactful for myself, as I didn't even get this far when I worked on a time series project 2 years ago for fun.
